@@ -1,0 +1,20 @@
+---
+title: "Assignment 1 - PSL Fall 2020"
+author: "Derek Chapman"
+date: "8/27/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(class)
+fig_width = "90%"
+cache_set = T
+```
+
+
+csize = 10
+p = 2
+s = 1
+
+m1
