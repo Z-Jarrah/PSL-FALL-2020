@@ -1,22 +1,17 @@
 ##### assignment 1 test code
 library(class)
 
-plot(c(-2, 2), c(-2, 2), type = "n")
-points(m1, col = 'green')
-points(m0, col = "red", add = T)
-
 #helper functions
 generate_samples = function(s = 1, num_train = 200, num_test = 10000){
   num_centers = 10
   p = 2
-  s = 1
   
   #distribution 'centers'
   m1 = matrix(rnorm(num_centers*p), num_centers, p) * s + cbind(rep(1, num_centers), rep(0, num_centers))
   m0 = matrix(rnorm(num_centers*p), num_centers, p) * s + cbind(rep(0, num_centers), rep(1, num_centers))
   
   
-  s = sqrt(1/5)
+  # s = sqrt(1/5)
   #training data
   id1 = sample(1:num_centers, num_train, replace = T)
   id0 = sample(1:num_centers, num_train, replace = T)
@@ -30,14 +25,12 @@ generate_samples = function(s = 1, num_train = 200, num_test = 10000){
   test_data = matrix(rnorm(2*num_test*p), 2*num_test, p)*s + rbind(m1[id1, ], m0[id0, ])
   Ytest = factor(c(rep(1, num_test), rep(0, num_test)))
   test = as.data.frame(cbind(Ytest, test_data))
-  samples = list(train = train, test = test, m0 = m0, m1 = m1)
+  samples = list(train = train, test = test)
   }
 
 #get cross-validated error rate for a single k value
 get_cv_k_err = function(data, Y, k_val, folds = 10){
   error = 0
-  fold_size = floor(nrow(data)/folds)
-  
   for(fold in 1:folds){
     #create our folds (split train/test data)
     testset_index = ((fold - 1)*fold_size + 1) : (fold*fold_size)
@@ -67,125 +60,64 @@ get_best_k = function(data, Y, folds = 10){
   max(ks[cv_k_err_rates == min(cv_k_err_rates)])
 }
 
-#determine most likely cluster the point is from
-mixnorm = function(x, m0, m1){
-  sum(exp(-apply((t(m1)-x)^2, 2, sum) * 5/2)) / sum(exp(-apply((t(m0)-x)^2, 2, sum) * 5/2))
-  }
-
-
-plot_samples = function(dataset){
-  xr = range(dataset[, 2])
-  yr = range(dataset[, 3])
-  # yr = range(samples$train$Ytrain, samples$test$Ytest)
-  color = rep(NA, nrow(dataset))
-  color[which(dataset[, 1] == 2)] = 'red'
-  color[which(dataset[, 1] == 1)] = 'blue'
-  
-  plot(xr, yr, type = "n", xlab = "X2", ylab = "X3")
-  points(dataset[, 2], dataset[, 3],
-         col = color,
-         pch = 20,
-         cex = .5)
-  }
 
 #repeat process 20x
 seed = 0721
 set.seed(seed)
 #**********fix********#
 sims = 10
-best_ks = rep(0, sims)
 err = data.frame(
   slr.train  = rep(0, sims),
   slr.test   = rep(0, sims),
   quad.train = rep(0, sims),
   quad.test  = rep(0, sims),
   knn.train  = rep(0, sims),
-  knn.test   = rep(0, sims),
-  bayes.train= rep(0, sims),
-  bayes.test = rep(0, sims)
+  knn.test   = rep(0, sims)
   )
 
 for(i in 1:sims){
   print(paste("on sim", i))
   samples = generate_samples()
   trainX = samples$train[c("V2", "V3")]
-  trainY = samples$train$Ytrain - 1
+  trainY = samples$train$Ytrain
   testX  = samples$test[c("V2", "V3")]
-  testY  = samples$test$Ytest - 1
+  testY  = samples$test$Ytest
   
-  #slr -- train
+  #slr  #train data
   slr_mdl = lm(as.numeric(Ytrain) - 1 ~ ., data = samples$train)
   slr_train_pred   = as.numeric(slr_mdl$fitted.values > 0.5)
-  err$slr.train[i] = sum(slr_train_pred != trainY) / nrow(samples$train)
+  err$slr.train[i] = sum(slr_train_pred != samples$train$Ytrain) / nrow(samples$train)
   
-  #slr -- test 
+  #test data
   slr_test_pred   = ifelse(predict(slr_mdl, newdata = samples$test) > 0.5, 1, 0)
-  err$slr.test[i] = sum(slr_test_pred != testY) / nrow(samples$test)
+  err$slr.test[i] = sum(slr_test_pred != samples$test$Ytest) / nrow(samples$test)
   
-  #quadratic -- train
+  #quadratic   #train data
   quadratic_mdl     = lm((as.numeric(Ytrain) - 1) ~ V2 + V3 + I(V2*V3) + I(V2^2) + I(V3^2), data = samples$train)
   quad_train_pred   = as.numeric(quadratic_mdl$fitted.values > 0.5)
-  err$quad.train[i] = sum(quad_train_pred != trainY) / nrow(samples$train)
+  err$quad.train[i] = sum(quad_train_pred != samples$test$Ytest) / nrow(samples$test)
   
   #quadratic test data
   quad_test_pred   = ifelse(predict(quadratic_mdl, newdata = samples$test) > 0.5, 1, 0)
-  err$quad.test[i] = sum(quad_test_pred != testY) / nrow(samples$test)
+  err$quad.test[i] = sum(quad_test_pred != samples$test$Ytest) / nrow(samples$test)
   
   #knn
-  best_ks[i] = get_best_k(trainX, trainY, 10)
-  #knn train
-  train_pred = knn(trainX, trainX, trainY , k = best_ks[i])
-  err$knn.train[i] = sum(train_pred != trainY) / nrow(samples$train)
-  #knn test
-  test_pred = knn(trainX, testX, trainY, k = best_ks[i])
-  err$knn.test[i] = sum(test_pred != testY) / nrow(samples$test)
+
   
-  #bayes error train
-  traindata = samples$train[c("V2", "V3")]
-  bayes_train_pred = apply(traindata, 1, mixnorm, m0 = samples$m0, m1 = samples$m1)
-  bayes_train_pred = as.numeric(bayes_train_pred > 1)
-  err$bayes.train[i] = sum(bayes_train_pred != (samples$train$Ytrain-1)) / nrow(samples$train)
+  best_k = get_best_k(trainX, trainY, 10)
   
-  #bayes error test
-  testdata = samples$test[c("V2", "V3")]
-  bayes_test_pred = apply(testdata, 1, mixnorm, m0 = samples$m0, m1 = samples$m1)
-  bayes_test_pred = as.numeric(bayes_test_pred > 1)
-  err$bayes.test[i] = sum(bayes_test_pred != (samples$test$Ytest-1)) / nrow(samples$test)  
-  }
+  train_pred = knn(trainX, trainX, trainY , k = best_k)
+  err$knn.train[i] = sum(train_pred != trainY) / nrow(trainX)
+  test_pred = knn(trainX, testX, trainY, k = best_k)
+  err$knn.test[i] = sum(test_pred != testY) / nrow(testX)
+  
+}
 
-mean(best_ks)
-sd(best_ks)
-
-#plot SLR + line
-plot_samples(samples$train)
-grid()
-title(main = "Linear Model with Decision Boundary")
-legend('bottomleft', 
-       c("Class 1", "Class 0"),
-       col = c("Red", "Blue"),
-       bty = "a",
-       pch = 19,
-       pt.cex = .75,
-       horiz = F, 
-       inset = c(0.1, 0.1))
-slope = -slr_mdl$coef[[2]] / slr_mdl$coef[[3]]
-intercept = (0.5 - slr_mdl$coef[[1]]) / slr_mdl$coef[[3]]
-abline(a=intercept, b=slope, lwd = 2, lty = 3)
-
-#plot quadratic + line
-plot(samples$train)
-grid()
-title(main = "Quadratic Model with Decision Boundary")
-quadratic_mdl$coefficients
-
-#train/test error for all methods
-colors = c("mediumblue", "darkorange2")
-x_labels = c("SLR", "Quadratic LM", "kNN", "Bayes")
+colors = c("orange3", "khaki4")    #**************************#
 boxplot(err,
-        ylab = "Error Rates",
-        xaxt = "none",
+        xlab = c("Training Data", "Testing Data"),
         col = colors,
-        main = "Simulating Train/Tes Error with Various Methods")
+        main = "Simulating Train/Testing Error with Various Procedures")
 legend('bottomright', 
        c("Training Data", "Testing Data"),
        col = colors,
@@ -194,10 +126,6 @@ legend('bottomright',
        pt.cex = .75,
        horiz = F, 
        inset = c(0.1, 0.1))
-axis(1, at= c(1.5, 3.5, 5.5, 7.5), labels = x_labels)
-
-
-
 
 
 
