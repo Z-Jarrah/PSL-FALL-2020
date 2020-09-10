@@ -1,10 +1,6 @@
 ##### assignment 1 test code
 library(class)
 
-plot(c(-2, 2), c(-2, 2), type = "n")
-points(m1, col = 'green')
-points(m0, col = "red", add = T)
-
 #helper functions
 generate_samples = function(s = 1, num_train = 200, num_test = 10000){
   num_centers = 10
@@ -92,7 +88,7 @@ plot_samples = function(dataset){
 seed = 0721
 set.seed(seed)
 #**********fix********#
-sims = 10
+sims = 20
 best_ks = rep(0, sims)
 err = data.frame(
   slr.train  = rep(0, sims),
@@ -153,8 +149,7 @@ for(i in 1:sims){
   err$bayes.test[i] = sum(bayes_test_pred != (samples$test$Ytest-1)) / nrow(samples$test)  
   }
 
-mean(best_ks)
-sd(best_ks)
+
 
 #plot SLR + line
 plot_samples(samples$train)
@@ -194,9 +189,26 @@ legend('bottomright',
        pt.cex = .75,
        horiz = F, 
        inset = c(0.1, 0.1))
-axis(1, at= c(1.5, 3.5, 5.5, 7.5), labels = x_labels)
+axis(1, at = c(1.5, 3.5, 5.5, 7.5), labels = x_labels)
 
-
+#best k values with mean and sd range
+{
+plot(best_ks, 
+     main = "Chosen k Value for kNN Method",
+     xlab = "Iteration",
+     ylab = "k",
+     col = "dodgerblue", pch = 19)
+# grid()
+lines(best_ks, lty = 3)
+abline(h = mean(best_ks), lty = 4, col = "darkgreen")
+m = mean(best_ks)
+s = sd(best_ks)
+mtext("Mean", 1, at = 3, padj = -10)
+x0 = 0; x1 = 100
+y0 = m - (s/2)
+y1 = m + (s/2)
+rect(x0, y0, x1, y1, col = rgb(0.1, 0.1, 0.9, alpha = 0.2))
+}
 
 
 
