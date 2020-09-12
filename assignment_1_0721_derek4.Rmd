@@ -8,14 +8,56 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(class)
+
 fig_width = "90%"
 cache_set = T
 ```
 
+```{r}
+generate_samples = function(s = 1, num_train = 200, num_test = 10000){
+  num_centers = 10
+  p = 2
+  s = 1
+  
+  #distribution 'centers'
+  m1 = matrix(rnorm(num_centers*p), num_centers, p) * s + cbind(rep(1, num_centers), rep(0, num_centers))
+  m0 = matrix(rnorm(num_centers*p), num_centers, p) * s + cbind(rep(0, num_centers), rep(1, num_centers))
+  
+  s = sqrt(1/5)
+  
+  #training data
+  id1 = sample(1:num_centers, num_train, replace = T)
+  id0 = sample(1:num_centers, num_train, replace = T)
+  train_data = matrix(rnorm(2*num_train*p), 2*num_train, p)*s  + rbind(m1[id1, ], m0[id0, ])
+  Ytrain = factor(c(rep(1, num_train), rep(0, num_train)))
+  train = as.data.frame(cbind(Ytrain, train_data))
+  
+  #testing data
+  id1 = sample(1:num_centers, num_test, replace = T)
+  id0 = sample(1:num_centers, num_test, replace = T)
+  test_data = matrix(rnorm(2*num_test*p), 2*num_test, p)*s + rbind(m1[id1, ], m0[id0, ])
+  Ytest = factor(c(rep(1, num_test), rep(0, num_test)))
+  test = as.data.frame(cbind(Ytest, test_data))
+  samples = list(train = train, test = test, m0 = m0, m1 = m1)
+  }
+```
 
 
-csize = 10
-p = 2
-s = 1
+```{r, cache=T}
+plot(best_ks, 
+     main = "Chosen k Value for kNN Method",
+     xlab = "Iteration",
+     ylab = "k",
+     col = "dodgerblue", pch = 19)
+# grid()
+lines(best_ks, lty = 3)
+abline(h = mean(best_ks), lty = 4, col = "darkgreen")
+m = mean(best_ks)
+s = sd(best_ks)
+# mtext("Mean", 1, at = 3, padj = -10)
+x0 = 0; x1 = 100
+y0 = m - (s/2)
+y1 = m + (s/2)
+rect(x0, y0, x1, y1, col = rgb(0.1, 0.1, 0.9, alpha = 0.2))
+```
 
-m1

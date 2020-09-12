@@ -11,8 +11,8 @@ generate_samples = function(s = 1, num_train = 200, num_test = 10000){
   m1 = matrix(rnorm(num_centers*p), num_centers, p) * s + cbind(rep(1, num_centers), rep(0, num_centers))
   m0 = matrix(rnorm(num_centers*p), num_centers, p) * s + cbind(rep(0, num_centers), rep(1, num_centers))
   
-  
   s = sqrt(1/5)
+  
   #training data
   id1 = sample(1:num_centers, num_train, replace = T)
   id0 = sample(1:num_centers, num_train, replace = T)
@@ -53,7 +53,7 @@ get_best_k = function(data, Y, folds = 10){
   fold_size = floor(nrow(data)/folds)
   ks = seq(1, nrow(data) - fold_size, 2) 
   cv_k_err_rates = rep(0, length(ks))  
-  
+
   #get error rates for all k values
   for(k_i in 1:length(ks)){
     cv_k_err_rates[k_i] = get_cv_k_err(data, Y, ks[k_i], folds)
@@ -87,7 +87,7 @@ plot_samples = function(dataset){
 #repeat process 20x
 seed = 0721
 set.seed(seed)
-#**********fix********#
+
 sims = 20
 best_ks = rep(0, sims)
 err = data.frame(
@@ -130,7 +130,7 @@ for(i in 1:sims){
   #knn
   best_ks[i] = get_best_k(trainX, trainY, 10)
   #knn train
-  train_pred = knn(trainX, trainX, trainY , k = best_ks[i])
+  train_pred = knn(trainX, trainX, trainY, k = best_ks[i])
   err$knn.train[i] = sum(train_pred != trainY) / nrow(samples$train)
   #knn test
   test_pred = knn(trainX, testX, trainY, k = best_ks[i])
@@ -203,7 +203,7 @@ lines(best_ks, lty = 3)
 abline(h = mean(best_ks), lty = 4, col = "darkgreen")
 m = mean(best_ks)
 s = sd(best_ks)
-mtext("Mean", 1, at = 3, padj = -10)
+# mtext("Mean", 1, at = 3, padj = -10)
 x0 = 0; x1 = 100
 y0 = m - (s/2)
 y1 = m + (s/2)
