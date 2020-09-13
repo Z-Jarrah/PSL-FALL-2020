@@ -83,24 +83,9 @@ mixnorm = function(x, m0, m1){
   sum(exp(-apply((t(m1)-x)^2, 2, sum) * 5/2)) / sum(exp(-apply((t(m0)-x)^2, 2, sum) * 5/2))
   }
 
-
-plot_samples = function(dataset){
-  xr = range(dataset[, 2])
-  yr = range(dataset[, 3])
-  # yr = range(samples$train$Ytrain, samples$test$Ytest)
-  color = rep(NA, nrow(dataset))
-  color[which(dataset[, 1] == 2)] = 'red'
-  color[which(dataset[, 1] == 1)] = 'blue'
-  
-  plot(xr, yr, type = "n", xlab = "X2", ylab = "X3")
-  points(dataset[, 2], dataset[, 3],
-         col = color,
-         pch = 20,
-         cex = .5)
-  }
-
-
 ```
+
+#### Implementation of Procedures
 
 <em>
  
@@ -131,15 +116,15 @@ err = data.frame(
   )
 ```
 
+
 <em>
 A training set and test set of size 200 and 10,000 respectively, are initialized.   
-The training set is then fitted individually to each of the four procedures highlighted above to create four different models.
-Each of the models is then used to predict the labels [0,1] on each sample in the test set. 
+The training set is fitted individually to each of the four procedures highlighted above to create four different models.
+Each of the models are then used to predict the labels [0,1] on each sample in the test set. 
 </em>
 
 ```{r main}
 for(i in 1:sims){
-  print(paste("on sim", i))
   samples = generate_samples()
   trainX = samples$train[c("V2", "V3")]
   trainY = samples$train$Ytrain - 1
@@ -187,36 +172,41 @@ for(i in 1:sims){
   }
 ```
 
+#### Summarizing The Results
+
 <em>
-After iterating 20 times for each model, the results are plotted and summarized. The plots of the linear and quadratic models include
-the decision boundary  to better illustrate the model's equation. When examining the error rates of the four methods, the linear model generally
+After iterating 20 times for each model, the results are plotted and summarized. When examining the error rates of the four methods, the linear model generally
 performed worse than the other three procedures. Quadratic regression did not offer a significant improvement on the test data set. The k-Nearest Neighbors classifier was 
-considerably less erroneous on the training data but this did not translate over to the test data set. In terms of overall performance, the Bayes classifier had a higher error rate on the training set than k-NN but achieves the lowest error rate on the test data set among all the procedures implemented.
+considerably less erroneous on the training data but this did not translate to a lower error rate on the test data set. In terms of overall performance, the Bayes classifier had a higher error rate on the training set than k-NN but achieves the lowest error rate on the test data set among all the procedures implemented.
 
 </em>
 
-```{r slr_plot}
+```{r fig.align="center"}
 #plot SLR + line
-plot_samples(samples$train)
+xr = range(samples$train[, 2])
+yr = range(samples$train[, 3])
+color = rep(NA, nrow(samples$train))
+color[which(samples$train[, 1] == 2)] = 'red'
+color[which(samples$train[, 1] == 1)] = 'blue'
+
+plot(xr, yr, type = "n", xlab = "X2", ylab = "X3")
+points(samples$train[, 2], samples$train[, 3],
+       col = color,
+       pch = 20,
+       cex = .5)
 grid()
 title(main = "Linear Model with Decision Boundary")
-legend('bottomleft', 
+legend('topleft', 
        c("Class 1", "Class 0"),
        col = c("Red", "Blue"),
        bty = "a",
        pch = 19,
        pt.cex = .75,
-       horiz = F, 
-       inset = c(0.1, 0.1))
+       horiz = F
+       )
 slope = -slr_mdl$coef[[2]] / slr_mdl$coef[[3]]
 intercept = (0.5 - slr_mdl$coef[[1]]) / slr_mdl$coef[[3]]
 abline(a=intercept, b=slope, lwd = 2, lty = 3)
-
-#plot quadratic + line
-plot(samples$train)
-grid()
-title(main = "Quadratic Model with Decision Boundary")
-quadratic_mdl$coefficients
 
 #train/test error for all methods
 colors = c("mediumblue", "darkorange2")
@@ -225,15 +215,15 @@ boxplot(err,
         ylab = "Error Rates",
         xaxt = "none",
         col = colors,
-        main = "Simulating Train/Tes Error with Various Methods")
-legend('bottomright', 
+        main = "Simulating Train/Test Error with Various Methods")
+legend('bottomleft', 
        c("Training Data", "Testing Data"),
        col = colors,
        bty = "a",
        pch = 19,
        pt.cex = .75,
-       horiz = F, 
-       inset = c(0.1, 0.1))
+       horiz = F
+       )
 axis(1, at = c(1.5, 3.5, 5.5, 7.5), labels = x_labels)
 
 #best k values with mean and sd range
