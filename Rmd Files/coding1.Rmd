@@ -3,9 +3,11 @@ title: "CS598: Practical Statistical Learning Coding Assignment #1"
 output: html_document
 ---
 
-### Group Members: Derek Chapman and Zeed Jarrah
+### Team Members
+#####  Derek Chapman (derek4)
+#####  Zeed Jarrah (zjarrah2)  
 
-#### Helper Functions
+####  Helper Functions
 
 <em>
   1) Generate the training and test data  
