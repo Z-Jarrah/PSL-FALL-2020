@@ -14,8 +14,6 @@ X = as.matrix(myData[, -14])
 y = myData$Y
 lam.seq = c(0.30, 0.2, 0.1, 0.05, 0.02, 0.005)
 
-fit = lm(y~X,data=myData)
-summary(fit)
 
 one_var_lasso = function(r, x, lam) {
   xx = sum(x^2)
@@ -48,7 +46,12 @@ MyLasso = function(X, y, lam.seq, maxit = 50) {
 
   y.mean = mean(y)
   yc = y - mean(y)
-  Xs = (X - rowMeans(X)) / apply(X,2, FUN = sd)
+  x.mean = colMeans(X)
+  x.sd = (apply(X,2, FUN = sd) * sqrt((n-1)/n)) #Store sd of each feature of X
+  # Xs = scale(X, scale=FALSE) %*% diag(1/x.sd) #(X - rowMeans(X))/apply(X,2, FUN = sd)
+  Xs = scale(X) 
+  # apply(Xs,2, FUN = mean)
+  
   ##############################
 
   # Initialize coefficients vector b and residual vector r
@@ -66,26 +69,22 @@ MyLasso = function(X, y, lam.seq, maxit = 50) {
         r = r - Xs[, j] * b[j]
       }
     }
-    B[m, ] = c(0, b)                                                            # Leading 0 to represent y-intercept???
+    # Leading 0 to represent y-intercept
+    B[m, ] = c(0, b)                                                        
   }
-
+  
   ##############################
   # YOUR CODE:
   # Scale back the coefficients;
   # Update the intercepts stored in B[, 1]
   
-  
   # Update B
   B = t(B)
-  # Tip: its got all the coefficients from every run of lambda
-  B[1,1:6] = y.mean
-  for (row in 1:length(b)){
-    
-    for (col in 2:length(nlam)){
   
-    }
-  }
-
+  B[-1,] = B[-1, ]/x.sd
+  # Tip: its got all the coefficients from every run of lambda
+  
+  B[1,] = rep(y.mean, nlam) - t(t(B[-1,]) %*% x.mean)
   
   ##############################
   
@@ -96,8 +95,11 @@ lam.seq = c(0.30, 0.2, 0.1, 0.05, 0.02, 0.005)
 lasso.fit = glmnet(X, y, alpha = 1, lambda = lam.seq)
 coef(lasso.fit)
 
-myout = MyLasso(X, y, lam.seq, maxit = 50)
+myout = MyLasso(X, y, lam.seq, maxit = 300)
 rownames(myout) = c("Intercept", colnames(X))
 myout
 
 max(abs(coef(lasso.fit) - myout))
+abs(coef(lasso.fit) - myout)
+max(abs(coef(lasso.fit)[-1,] - myout[-1,]))
+# myout
