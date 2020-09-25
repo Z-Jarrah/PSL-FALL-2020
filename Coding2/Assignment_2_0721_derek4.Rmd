@@ -1,0 +1,117 @@
+---
+title: "CS598: Practical Statistical Learning Coding Assignment #2"
+author: "Derek Chapman (derek4), Zeed Jarrah (zjarrah2)"
+date: "9/24/2020"
+output: 
+  html_document: 
+    highlight: tango
+    theme: readable
+---
+
+```{r setup, message = F}
+library(MASS)
+library(glmnet)
+```
+
+> First we preprocess the housing data as prescribed:
+
+```{r preprocess}
+house_data = Boston
+colnames(house_data)[14] = "Y"
+ilog = c(1, 3, 5, 6, 8, 9, 10, 14)
+house_data[, ilog] = log(house_data[, ilog])
+house_data[, 2]  = house_data[, 2] / 10
+house_data[, 7]  = house_data[, 7]^2.5 / 10^4
+house_data[, 11] = exp(0.4 * house_data[, 11]) / 1000
+house_data[, 12] = house_data[, 12] / 100
+house_data[, 13] = sqrt(house_data[, 13])
+
+#setup Y ~ X and lambda values
+X = as.matrix(house_data[, -14])
+y = house_data[, 14]
+lam_seq = c(0.3, 0.2, 0.1, 0.05, 0.02, 0.005)
+```
+
+> We create our One Variable Lasso function to iterate over each predictor at each lambda level:
+
+```{r one-var-lasso}
+one_var_lasso = function(r, x, lam){
+  xx = sum(x^2)
+  xr = sum(r*x)
+  b = (abs(xr) - lam/2) / xx
+  b = sign(xr) * ifelse(b > 0, b, 0)
+  return(b)
+  }
+```
+
+> We then construct our main function that will create an estimated model using one variable Lasso at various lambda levels.  It returns these as a complete matrix rotated to the side so that the lambda values are the columns to match the output from `glmnet` to make it easier to compare the results and calculate deviation from that package's results.
+
+```{r main}
+#My Lasso
+my_lasso = function(X, y, lam_seq, maxiter = 50, cold_start = F){
+  n = dim(X)[1]
+  p = dim(X)[2]
+  num_lambda = length(lam_seq)
+  
+  #center and scale as needed
+  y_mean = mean(y)
+  y_centered = y - mean(y)
+  
+  X_means = colMeans(X)
+  X_centered = t(t(X) - X_means)
+  X.sd = apply(X, 2, sd) * sqrt((n-1)/n)
+  Xs = t(t(X_centered)/X.sd)
+  
+  #Initalize coef and residuals vectors
+  b = rep(0, p)
+  if(cold_start == T){r = rep(0, n)} else{r = y_centered}
+  B = matrix(nrow = num_lambda, ncol = p + 1)
+  
+  #scale the lambda to the one used in glmnet to compare
+  lam_seq_scaled = lam_seq * 2 * n
+  
+  for(l in 1:num_lambda){  #for each lambda value
+    for(i in 1:maxiter){  #for each iteration of our step value
+      for(j in 1:p){      #for each beta
+        #add in the effect of the current parameter
+        r = r + (Xs[, j] * b[j])
+        #perform one-variable-lasso
+        b[j] = one_var_lasso(r, Xs[, j], lam_seq_scaled[l])
+        #remove the effect of the current variable based on its new coefficient
+        r = r - (Xs[, j] * b[j])
+      }
+    }
+    B[l, ] = c(0, b)
+  }
+  
+  #unscale coefficients
+  B = t(B)
+  B[-1,] = B[-1, ]/X.sd
+  
+  #update intercepts in B[1, ]
+  B[1,] = rep(y_mean, num_lambda) - t(t(B[-1,]) %*% X_means)
+  
+  return(B)
+}
+```
+
+> We finally create models from  `glmnet` and our own Lasso calculations.
+
+```{r compare}
+official_fit = glmnet(X, y, alpha = 1, lambda = lam_seq)
+myout = my_lasso(X, y, lam_seq, maxit = 50)
+rownames(myout) = c("Intercept", colnames(X))
+difference = max(abs(coef(official_fit) - myout))
+```
+
+> First we compare the coefficients created by each method for all of the lambda values.
+
+```{r official_betas}
+round(coef(official_fit), 3)
+```
+
+```{r my_the_lasso}
+round(myout, 3)
+```
+
+> And finally we check what the largest difference between the sets of coefficients is to see how close our calculations are:  `r difference`
