@@ -115,3 +115,5 @@ round(myout, 3)
 ```
 
 > And finally we check what the largest difference between the sets of coefficients is to see how close our calculations are:  `r difference`
+>
+> Looks good!  Our largest difference is $< 0.005$
