@@ -95,11 +95,6 @@ lam.seq = c(0.30, 0.2, 0.1, 0.05, 0.02, 0.005)
 lasso.fit = glmnet(X, y, alpha = 1, lambda = lam.seq)
 coef(lasso.fit)
 
-myout = MyLasso(X, y, lam.seq, maxit = 300)
+myout = MyLasso(X, y, lam.seq, maxit = 50)
 rownames(myout) = c("Intercept", colnames(X))
-myout
-
 max(abs(coef(lasso.fit) - myout))
-abs(coef(lasso.fit) - myout)
-max(abs(coef(lasso.fit)[-1,] - myout[-1,]))
-# myout
