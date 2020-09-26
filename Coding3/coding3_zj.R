@@ -1,3 +1,4 @@
+#===============================================================================
 lo.lev <- function(x1, sp){
   # x1: feature vector of length n
   # sp: a value for "span"
@@ -48,6 +49,8 @@ myCV <- function(x1, y1, span){
   }
   return(list(cv = cv, gcv = gcv))
 }
+
+#===============================================================================
 
 mydata = read.csv(file = "Coding3_Data.csv")
 dim(mydata)
