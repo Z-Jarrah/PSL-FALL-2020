@@ -107,11 +107,11 @@ difference = max(abs(coef(official_fit) - myout))
 > First we compare the coefficients created by each method for all of the lambda values.
 
 ```{r official_betas}
-round(coef(official_fit), 3)
+round(coef(official_fit), 5)
 ```
 
 ```{r my_the_lasso}
-round(myout, 3)
+round(myout, 5)
 ```
 
 > And finally we check what the largest difference between the sets of coefficients is to see how close our calculations are:  `r difference`
