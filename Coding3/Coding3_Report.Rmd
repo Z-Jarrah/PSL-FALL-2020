@@ -1,0 +1,121 @@
+---
+title: "CS 598 Practical Statistical Learning Coding Assignment #3"
+output: html_document
+---
+### Team Members
+#####  Derek Chapman (derek4)
+#####  Zeed Jarrah (zjarrah2)  
+
+####  Helper Functions
+<em>
+1) lo.lev
+The smoother matrix is computed and used to store the diagonal values in the vector lev.
+The method for recreating the smoother matrix uses the identity matrix Id_mat and
+performing matrix multiplication on the matrix containing the predicted values as seen using the method predict(loess()).
+
+2)onestep_CV
+The residual error is computed separately and stored as a vector to be used in the computation 
+of LOO-CV and GCV. We note that the distinguishing factor between the two are that we use mean
+leverage when computing GCV.
+
+3)myCV
+This function calls onestep_CV and is used to compute LOOCV and GCV for every value of span in the sequence.
+</em>
+
+```{r prep_func}
+lo.lev <- function(x1, sp){
+  # x1: feature vector of length n
+  # sp: a value for "span"
+  
+  n = length(x1);
+  lev = rep(0, n)
+  
+  S_mat = matrix(0,n,n)
+  Id_mat = diag(n)
+  #Fitted values
+  
+  # Consider changing name of i
+  for(i in 1:n){
+    S_mat[,i] = predict(loess(Id_mat[,i] ~ x1, span = sp))
+  }
+  
+  #diagonals of S-lambda or also called span
+  lev = diag(S_mat)
+  
+  return(lev)
+}
+
+onestep_CV <- function(x1, y1, sp){
+  fit1 = loess(y1 ~ x1, span = sp)
+  resid_vec = resid(fit1)
+
+  S_vec = lo.lev(x1, sp)
+  # LOO-CV
+  cv = mean((resid_vec/(1-S_vec))^2)
+  # GCV
+  mean_lev = mean(S_vec)
+  gcv = mean((resid_vec/(1-mean_lev))^2)
+  
+  return(list(cv = cv, gcv = gcv))
+}
+
+myCV <- function(x1, y1, span){
+  # x1: feature vector of length n
+  # y1: response vector of length n
+  # span: a sequence of values for "span"
+  
+  m = length(span)
+  cv = rep(0, m)
+  gcv = rep(0, m)
+  
+  for(i in 1:m){
+    tmp = onestep_CV(x1, y1, span[i])
+    cv[i] = tmp$cv
+    gcv[i] = tmp$gcv
+  }
+  return(list(cv = cv, gcv = gcv))
+}
+
+#===============================================================================
+```
+<em>
+Plotting the fitted curve against the observed data values.
+<em/>
+```{r fig.align="center"}
+# Testing Function
+mydata = read.csv(file = "Coding3_Data.csv")
+dim(mydata)
+
+plot(mydata$x, mydata$y, xlab="", ylab="")
+
+span1 = seq(from = 0.2, by = 0.05, length = 15 )
+cv.out = myCV(mydata$x, mydata$y, span1)
+
+# Print Results
+myout = data.frame(CV = cv.out$cv, 
+                   GCV = cv.out$gcv, 
+                   span = span1)
+myout
+
+myout$span[myout$GCV == min(myout$GCV)]
+
+myout$span[myout$CV == min(myout$CV)]
+
+# Plot The Fitted Curve
+spangcv.min = myout$span[myout$GCV == min(myout$GCV)]
+spancv.min = myout$span[myout$CV == min(myout$CV)]
+```
+
+```{r fig.align="center"}
+
+plot(mydata$x, mydata$y, xlab="", ylab="", col="gray");
+fx = 1:50/50;
+fy = sin(12*(fx+0.2))/(fx+0.2)
+lines(fx, fy, col=8, lwd=2)
+
+f = loess(y ~ x, mydata, span = spangcv.min)
+lines(fx, predict(f, data.frame(x = fx), surface = "direct"), 
+      lty=2, lwd=2, col="blue")
+```
+
+Notice how the optimal span for both Leave-one-out Cross Validation and Generalized Cross Validation is 0.05.

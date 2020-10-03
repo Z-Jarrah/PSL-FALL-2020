@@ -57,7 +57,7 @@ my_CV = function(x1, y1, spans){
 
 
 # setup
-setwd("~/Google Drive/Geek2/UofIll/CS598_PSL/Assignment_3")
+#("~/Google Drive/Geek2/UofIll/CS598_PSL/Assignment_3")
 my_data = read.csv("Coding3_Data.csv")
 spans = seq(from = 0.20, to = 0.90, length = 15)
 
