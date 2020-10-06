@@ -92,8 +92,13 @@ cv.out = myCV(mydata$x, mydata$y, span1)
 myout = data.frame(CV = cv.out$cv, 
                    GCV = cv.out$gcv, 
                    span = span1)
-myout
+```
 
+It should be noted that the optimal span value for both LOOCV and GCV is 0.5.
+```{r fig.align="center"}
+myout
+```
+```{r }
 myout$span[myout$GCV == min(myout$GCV)]
 
 myout$span[myout$CV == min(myout$CV)]
