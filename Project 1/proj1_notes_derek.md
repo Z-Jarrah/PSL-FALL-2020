@@ -26,7 +26,7 @@ Correlation plots didn't like the categorical/factor variables either.  Also did
 
 Used lasso as a way of EDA by looking at which factors at different levels (permissive, middle, restrictive) where left in.  Used the absolute value and a threshold that kept about 50% of the variables for that beta value so that noes that were shrunk close to zero were tossed from consideration.
 
-
+Based on a table() the overall_cond and overall_qual seem very similar
 
 ## Scores
 
