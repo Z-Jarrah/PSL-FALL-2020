@@ -12,37 +12,204 @@ extra_lvls = function(train_c, test_c){
   return(extra_c)
 }
 
-drop_columns = function(df, drop_cs){
-  
-}
+library(glmnet)
+library(fastDummies)
+
+j = 10
 
 #import and setup train/test data for a specifc train/test set
 results.mdl1 = double(10)
 results.mdl2 = double(10)
-
-j = 2
+results.mdl3 = double(10)
 
 for(j in 1:10) {
+  print(cat("Iteration ", j, "   ##############"))
   testIDs = read.table("project1_testIDs.dat")
-  data    = read.csv("Ames_data.csv")
+  data    = read.csv("Ames_data.csv", stringsAsFactors = F)
   train_j = data[-testIDs[, j],]
   test_j  = data[testIDs[, j],-83]
   test_jy = data[testIDs[, j], c(1, 83)]
   
   #insert function to test model 1 here
-  results.mdl1[j] = mdl1_fun(train_j, test_j, test_jy)
-  results.mdl2[j] = mdl2_fun(train_j, test_j, test_jy)
+  # results.mdl1[j] = mdl1_fun(train_j, test_j, test_jy)
+  # results.mdl2[j] = mdl2_fun(train_j, test_j, test_jy)
+  results.mdl3[j] = mdl3_fun(train_j, test_j, test_jy)
 }
 
 mdl1_fun = function(train, test, test_y){
-  #remove garage built year
+  train[, 83] = log(train[, 83])
+  y = as.numeric(unlist(train[83]))
+  X = train[, -c(1, 83)]
+  test$PID = NULL
   
+  X = subset(X, select = -c(Garage_Yr_Blt, Street, Utilities,  Condition_2, Roof_Matl, 
+                            Heating, Pool_QC, Misc_Feature, Low_Qual_Fin_SF,
+                            Pool_Area, Longitude, Latitude))
+  test = subset(test, select = -c(Garage_Yr_Blt, Street, Utilities,  Condition_2, Roof_Matl, 
+                                  Heating, Pool_QC, Misc_Feature, Low_Qual_Fin_SF,
+                                  Pool_Area, Longitude,Latitude))
+  
+  winsor.vars <- c("Lot_Frontage", "Lot_Area", "Mas_Vnr_Area", "BsmtFin_SF_2", "Bsmt_Unf_SF", "Total_Bsmt_SF", "Second_Flr_SF", 'First_Flr_SF', "Gr_Liv_Area", "Garage_Area", "Wood_Deck_SF", "Open_Porch_SF", "Enclosed_Porch", "Three_season_porch", "Screen_Porch", "Misc_Val")
+  quan.value <- 0.95
+  for(var in winsor.vars){
+    tmp <- X[, var]
+    myquan <- quantile(tmp, probs = quan.value, na.rm = TRUE)
+    tmp[tmp > myquan] <- myquan
+    X[, var] <- tmp
+    
+    tmp <- test[, var]
+    myquan <- quantile(tmp, probs = quan.value, na.rm = TRUE)
+    tmp[tmp > myquan] <- myquan
+    test[, var] <- tmp
+  }
+  
+  X$train = 1
+  test$train = 0
+  full = rbind(X, test)
+  
+  full_dummies = dummy_cols(full, remove_first_dummy = T, remove_selected_columns = T)
+  X_dummies = full_dummies[full_dummies$train == 1, ]
+  test_dummies = full_dummies[full_dummies$train == 0, ]
+  
+  # X_dummies = dummy_cols(X, remove_first_dummy = T, remove_selected_columns = T)
+  # test_dummies = dummy_cols(test, remove_first_dummy = T, remove_selected_columns = T)
+  
+  X_dummies = data.matrix(X_dummies)
+  test_dummies = data.matrix(test_dummies)
+  
+  cv_select = cv.glmnet(X_dummies, y, alpha = 1)
+  sel_vars = predict(cv_select, type="nonzero", s = cv_select$lambda.1se)$X1
+  ridge_select = cv.glmnet(X_dummies[, sel_vars], y, alpha = 0)
+  
+  
+  pred_select = predict(ridge_select, s = ridge_select$lambda.min, 
+                        newx = (test_dummies[, sel_vars]))
+  return(sqrt(mean((abs(pred_select) - log(test_y$Sale_Price))^2)))
 }
 
 mdl2_fun = function(train, test, test_y){
+  train[, 83] = log(train[, 83])
+  y = as.numeric(unlist(train[83]))
+  X = train[, -c(1, 82)]
+  
+  winsor.vars <- c("Lot_Frontage", "Lot_Area", "Mas_Vnr_Area", "BsmtFin_SF_2", "Bsmt_Unf_SF", "Total_Bsmt_SF", "Second_Flr_SF", 'First_Flr_SF', "Gr_Liv_Area", "Garage_Area", "Wood_Deck_SF", "Open_Porch_SF", "Enclosed_Porch", "Three_season_porch", "Screen_Porch", "Misc_Val")
+  quan.value <- 0.95
+  for(var in winsor.vars){
+    tmp <- X[, var]
+    myquan <- quantile(tmp, probs = quan.value, na.rm = TRUE)
+    tmp[tmp > myquan] <- myquan
+    X[, var] <- tmp
+    
+    tmp <- test[, var]
+    myquan <- quantile(tmp, probs = quan.value, na.rm = TRUE)
+    tmp[tmp > myquan] <- myquan
+    test[, var] <- tmp
+  }
+  
+  X = subset(X, select = c(Lot_Area, Year_Built, Year_Remod_Add, Total_Bsmt_SF, Garage_Cars, 
+                           Gr_Liv_Area, Bsmt_Full_Bath, Full_Bath, Kitchen_AbvGr, Fireplaces,
+                           Screen_Porch, Neighborhood, Overall_Qual,Bsmt_Qual, Central_Air, 
+                           Kitchen_Qual, Functional, Sale_Condition, Overall_Cond))
+  test_subset = subset(test, select = c(Lot_Area, Year_Built, Year_Remod_Add, Total_Bsmt_SF, Garage_Cars, 
+                                        Gr_Liv_Area, Bsmt_Full_Bath, Full_Bath, Kitchen_AbvGr, Fireplaces,
+                                        Screen_Porch, Neighborhood, Overall_Qual,Bsmt_Qual, Central_Air, 
+                                        Kitchen_Qual, Functional, Sale_Condition, Overall_Cond))
+  
+  lm_mdl = lm(y ~ ., data = X)
+  
+  rows_w_nas = drop_levels(test_subset, lm_mdl)
+  matched_true = test_y$Sale_Price
+  if(length(rows_w_nas) > 0){
+    test_subset = test_subset[-rows_w_nas, ]
+    matched_true = test_y$Sale_Price[-rows_w_nas]
+  }
+  
+  pred_lasso = predict(lm_mdl, newdata = test_subset)
+  return(sqrt(mean((abs(pred_lasso) - log(matched_true))^2)))
   
 }
 
+mdl3_fun = function(train, test, test_y){
+  #log transform the sale price then seperate the train data into predictor ~ response
+  train[, 83] = log(train[, 83])
+  y = as.numeric(unlist(train[83]))
+  X = train[, -c(1, 83)]
+  test$PID = NULL
+  
+  #remove a bunch of random or repeated fatures, remove Garage YR Blt due to missing values
+  X = subset(X, select = -c(Garage_Yr_Blt, Street, Utilities,  Condition_2, Roof_Matl, 
+                            Heating, Pool_QC, Misc_Feature, Low_Qual_Fin_SF,
+                            Pool_Area, Longitude, Latitude))
+  test = subset(test, select = -c(Garage_Yr_Blt, Street, Utilities,  Condition_2, Roof_Matl, 
+                                  Heating, Pool_QC, Misc_Feature, Low_Qual_Fin_SF,
+                                  Pool_Area, Longitude,Latitude))
+  
+  winsor.vars <- c("Lot_Frontage", "Lot_Area", "Mas_Vnr_Area", "BsmtFin_SF_2", "Bsmt_Unf_SF", "Total_Bsmt_SF", "Second_Flr_SF", 'First_Flr_SF', "Gr_Liv_Area", "Garage_Area", "Wood_Deck_SF", "Open_Porch_SF", "Enclosed_Porch", "Three_season_porch", "Screen_Porch", "Misc_Val")
+  quan.value <- 0.95
+  for(var in winsor.vars){
+    tmp <- X[, var]
+    myquan <- quantile(tmp, probs = quan.value, na.rm = TRUE)
+    tmp[tmp > myquan] <- myquan
+    X[, var] <- tmp
+    
+    tmp <- test[, var]
+    myquan <- quantile(tmp, probs = quan.value, na.rm = TRUE)
+    tmp[tmp > myquan] <- myquan
+    test[, var] <- tmp
+  }
+  
+  #process training data
+  categorical.vars <- colnames(X)[
+    which(sapply(X, function(x) mode(x)=="character"))]
+  train.matrix <- X[, !colnames(X) %in% categorical.vars, drop=FALSE]
+  saved_levels = list()
+  n.train <- nrow(train.matrix)
+  for(var in categorical.vars){
+    mylevels <- sort(unique(X[, var]))
+    saved_levels[[var]] = mylevels
+    m <- length(mylevels)
+    m <- ifelse(m>2, m, 1)
+    tmp.train <- matrix(0, n.train, m)
+    col.names <- NULL
+    for(j in 1:m){
+      tmp.train[X[, var]==mylevels[j], j] <- 1
+      col.names <- c(col.names, paste(var, '_', mylevels[j], sep=''))
+    }
+    colnames(tmp.train) <- col.names
+    train.matrix <- cbind(train.matrix, tmp.train)
+  }
+  
+  #select variables and create model
+  t_matrix = data.matrix(train.matrix)
+  cv_select = cv.glmnet(t_matrix, y, alpha = 1)
+  sel_vars = predict(cv_select, type="nonzero", s = cv_select$lambda.1se)$X1
+  sel_vars = predict(cv_select, type="nonzero", s = cv_select$lambda.1se)$X1
+  ridge_select = glmnet(t_matrix[, sel_vars], y, lambda = cv_select$lambda.1se, alpha = 0)
+  
+  #process test data
+  # categorical.vars <- colnames(X)[
+  #   which(sapply(X, function(x) mode(x)=="character"))]
+  test.matrix <- test[, !colnames(test) %in% categorical.vars, drop=FALSE]
+  n.test <- nrow(test.matrix)
+  for(var in categorical.vars){
+    mylevels = saved_levels[[var]]
+    m = length(mylevels)
+    m <- ifelse(m>2, m, 1)
+    temp_test <- matrix(0, n.test, m)
+    col.names <- NULL
+    for(j in 1:m){
+      temp_test[test[, var]==mylevels[j], j] <- 1
+      col.names <- c(col.names, paste(var, '_', mylevels[j], sep=''))
+    }
+    colnames(temp_test) <- col.names
+    test.matrix <- cbind(test.matrix, temp_test)
+  }
+  
+  test_select = data.matrix(test.matrix[, sel_vars])
+  pred_ridge = predict(ridge_select, newx = test_select)
+  
+  return(sqrt(mean((abs(pred_ridge) - log(test_y$Sale_Price))^2)))
+}
 # write the test files for later pipeline testing into features and response
 write.csv(train_j, file = "train.csv", row.names = F)
 write.csv(test_j,  file = "test.csv", row.names = F)
@@ -380,9 +547,200 @@ pred_lasso = predict(lasso_mdl, newx = copy)
 
 pred_select = predict(ridge_select, s = ridge_select$lambda.min, 
                       newx = (copy[, sel_vars]))
+
+pred_select = predict(ridge_select, s = ridge_select$lambda.min, 
+                      newx = (copy[, sel_vars]))
 sqrt(mean((abs(pred_select) - log(true_price$Sale_Price))^2))
 }
 
+her_function = function(train.x){
+  categorical.vars <- colnames(train.x)[
+    which(sapply(train.x,
+                 function(x) mode(x)=="character"))]
+  train.matrix <- train.x[, !colnames(train.x) %in% categorical.vars, 
+                          drop=FALSE]
+  
+  saved_levels = list()
+  n.train <- nrow(train.matrix)
+  for(var in categorical.vars){
+    mylevels <- sort(unique(train.x[, var]))
+    saved_levels[[var]] = mylevels
+    m <- length(mylevels)
+    m <- ifelse(m>2, m, 1)
+    tmp.train <- matrix(0, n.train, m)
+    col.names <- NULL
+    for(j in 1:m){
+      tmp.train[train.x[, var]==mylevels[j], j] <- 1
+      col.names <- c(col.names, paste(var, '_', mylevels[j], sep=''))
+    }
+    colnames(tmp.train) <- col.names
+    train.matrix <- cbind(train.matrix, tmp.train)
+  }
+  
+  return(train.matrix)
+}
+
+#try 9
+#hers using lasso feature selection into a lm
+{
+  library(glmnet)
+  library(fastDummies)
+  train = read.csv("train.csv", stringsAsFactors = F)
+  test  = read.csv("test.csv", stringsAsFactors = F)
+  true_price = read.csv("test_y.csv")
+  
+  #log transform the sale price then seperate the train data into predictor ~ response
+  train[, 83] = log(train[, 83])
+  y = as.numeric(unlist(train[83]))
+  X = train[, -c(1, 83)]
+  test$PID = NULL
+  
+  #remove a bunch of random or repeated fatures, remove Garage YR Blt due to missing values
+  X = subset(X, select = -c(Garage_Yr_Blt, Street, Utilities,  Condition_2, Roof_Matl, 
+                            Heating, Pool_QC, Misc_Feature, Low_Qual_Fin_SF,
+                            Pool_Area, Longitude, Latitude))
+  test = subset(test, select = -c(Garage_Yr_Blt, Street, Utilities,  Condition_2, Roof_Matl, 
+                                  Heating, Pool_QC, Misc_Feature, Low_Qual_Fin_SF,
+                                  Pool_Area, Longitude,Latitude))
+  
+  winsor.vars <- c("Lot_Frontage", "Lot_Area", "Mas_Vnr_Area", "BsmtFin_SF_2", "Bsmt_Unf_SF", "Total_Bsmt_SF", "Second_Flr_SF", 'First_Flr_SF', "Gr_Liv_Area", "Garage_Area", "Wood_Deck_SF", "Open_Porch_SF", "Enclosed_Porch", "Three_season_porch", "Screen_Porch", "Misc_Val")
+  quan.value <- 0.95
+  for(var in winsor.vars){
+    tmp <- X[, var]
+    myquan <- quantile(tmp, probs = quan.value, na.rm = TRUE)
+    tmp[tmp > myquan] <- myquan
+    X[, var] <- tmp
+    
+    tmp <- test[, var]
+    myquan <- quantile(tmp, probs = quan.value, na.rm = TRUE)
+    tmp[tmp > myquan] <- myquan
+    test[, var] <- tmp
+  }
+  
+  #process training data
+  categorical.vars <- colnames(X)[
+    which(sapply(X, function(x) mode(x)=="character"))]
+  train.matrix <- X[, !colnames(X) %in% categorical.vars, drop=FALSE]
+  saved_levels = list()
+  n.train <- nrow(train.matrix)
+  for(var in categorical.vars){
+    mylevels <- sort(unique(train.x[, var]))
+    saved_levels[[var]] = mylevels
+    m <- length(mylevels)
+    m <- ifelse(m>2, m, 1)
+    tmp.train <- matrix(0, n.train, m)
+    col.names <- NULL
+    for(j in 1:m){
+      tmp.train[train.x[, var]==mylevels[j], j] <- 1
+      col.names <- c(col.names, paste(var, '_', mylevels[j], sep=''))
+    }
+    colnames(tmp.train) <- col.names
+    train.matrix <- cbind(train.matrix, tmp.train)
+  }
+  
+  #select variables and create model
+  t_matrix = data.matrix(train.matrix)
+  cv_select = cv.glmnet(t_matrix, y, alpha = 1)
+  sel_vars = predict(cv_select, type="nonzero", s = cv_select$lambda.1se)$X1
+  sel_vars = predict(cv_select, type="nonzero", s = cv_select$lambda.1se)$X1
+  ridge_select = glmnet(t_matrix[, sel_vars], y, lambda = cv_select$lambda.1se, alpha = 0)
+  
+  #process test data
+  # categorical.vars <- colnames(X)[
+  #   which(sapply(X, function(x) mode(x)=="character"))]
+  test.matrix <- test[, !colnames(test) %in% categorical.vars, drop=FALSE]
+  n.test <- nrow(test.matrix)
+  for(var in categorical.vars){
+    mylevels = saved_levels[[var]]
+    m = length(mylevels)
+    m <- ifelse(m>2, m, 1)
+    temp_test <- matrix(0, n.test, m)
+    col.names <- NULL
+    for(j in 1:m){
+      temp_test[test[, var]==mylevels[j], j] <- 1
+      col.names <- c(col.names, paste(var, '_', mylevels[j], sep=''))
+    }
+    colnames(temp_test) <- col.names
+    test.matrix <- cbind(test.matrix, temp_test)
+  }
+  
+  test_select = data.matrix(test.matrix[, sel_vars])
+  pred_ridge = predict(ridge_select, newx = test_select)
+  
+  sqrt(mean((abs(pred_ridge) - log(true_price$Sale_Price))^2))
+}
+
+#try 10
+#simple lr with select predictors above
+{
+  train[, 83] = log(train[, 83])
+  y = as.numeric(unlist(train[83]))
+  X = train[, -c(1, 82)]
+  
+  winsor.vars <- c("Lot_Frontage", "Lot_Area", "Mas_Vnr_Area", "BsmtFin_SF_2", "Bsmt_Unf_SF", "Total_Bsmt_SF", "Second_Flr_SF", 'First_Flr_SF', "Gr_Liv_Area", "Garage_Area", "Wood_Deck_SF", "Open_Porch_SF", "Enclosed_Porch", "Three_season_porch", "Screen_Porch", "Misc_Val")
+  quan.value <- 0.95
+  for(var in winsor.vars){
+    tmp <- X[, var]
+    myquan <- quantile(tmp, probs = quan.value, na.rm = TRUE)
+    tmp[tmp > myquan] <- myquan
+    X[, var] <- tmp
+    
+    tmp <- test[, var]
+    myquan <- quantile(tmp, probs = quan.value, na.rm = TRUE)
+    tmp[tmp > myquan] <- myquan
+    test[, var] <- tmp
+  }
+  
+  X = subset(X, select = c(Lot_Area, Year_Built, Year_Remod_Add, Total_Bsmt_SF, Garage_Cars, 
+                           Gr_Liv_Area, Bsmt_Full_Bath, Full_Bath, Kitchen_AbvGr, Fireplaces,
+                           Screen_Porch, Neighborhood, Overall_Qual,Bsmt_Qual, Central_Air, 
+                           Kitchen_Qual, Functional, Sale_Condition, Overall_Cond))
+  test_subset = subset(test, select = c(Lot_Area, Year_Built, Year_Remod_Add, Total_Bsmt_SF, Garage_Cars, 
+                                        Gr_Liv_Area, Bsmt_Full_Bath, Full_Bath, Kitchen_AbvGr, Fireplaces,
+                                        Screen_Porch, Neighborhood, Overall_Qual,Bsmt_Qual, Central_Air, 
+                                        Kitchen_Qual, Functional, Sale_Condition, Overall_Cond))
+  
+  lm_mdl = lm(y ~ ., data = X)
+  rows_w_nas = drop_levels(test_subset, lm_mdl)
+  print(rows_w_nas)
+  if(length(rows_w_nas) > 0){
+    test_subset = test_subset[-rows_w_nas, ]
+    matched_true = true_price$Sale_Price[-rows_w_nas]
+    print("dropping rows")
+  }
+  
+  pred_lasso = predict(lm_mdl, newdata = test_subset)
+  print(anyNA(output))
+  
+  return(sqrt(mean((abs(pred_lasso) - log(matched_true))^2)))
+  
+}
+
+match_levels = function(df, mdl){
+  lvls_names = names(lm_mdl$xlevels)
+  
+  for(n in lvls_names)
+  {
+    mdl$xlevels[[n]] = union(mdl$xlevels[[n]], levels(as.factor(df[,n])))
+  }
+  return(mdl)
+}
+
+drop_levels = function(df, mdl){
+  lvls_names = names(mdl$xlevels)
+  rows_nas = vector()
+  for(n in lvls_names){
+    # if the test observation has a differnt level for the predictor turn it into an NA
+    for(i in 1:nrow(df)){
+      if(!(df[i, n] %in% mdl$xlevels[[n]])){
+        rows_nas = append(rows_nas, i)
+        df[i,n] = NA
+      }
+    }
+  }
+  return(rows_nas)
+}
+#
 
 
 #get levels
