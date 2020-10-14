@@ -1,3 +1,5 @@
+library(glmnet)
+
 train = read.csv("train.csv", stringsAsFactors = F)
 test  = read.csv("test.csv", stringsAsFactors = F)
 true_price = read.csv("test_y.csv")
@@ -79,7 +81,7 @@ for(var in categorical.vars){
 
 #shift right due to PID in test matrix?
 test_select = data.matrix(test.matrix[, (sel_vars+1)])
-pred_ridge = predict(ridge_select, newx = test_select)
+pred_ridge = exp(predict(ridge_select, newx = test_select))
 
 #write submission file
 submission1 = cbind(PID = test$PID, Sale_Price = pred_ridge)
