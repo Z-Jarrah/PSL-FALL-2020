@@ -19,6 +19,7 @@ j = 10
 
 #import and setup train/test data for a specifc train/test set
 results.mdl1 = double(10)
+results.mdl15 = double(10)
 results.mdl2 = double(10)
 results.mdl3 = double(10)
 
@@ -31,8 +32,13 @@ for(j in 1:10) {
   test_jy = data[testIDs[, j], c(1, 83)]
   
   #insert function to test model 1 here
+  # set.seed(0271)
   # results.mdl1[j] = mdl1_fun(train_j, test_j, test_jy)
+  # set.seed(0271)
+  # results.mdl15[j] = mdl15_fun(train_j, test_j, test_jy)
+  # set.seed(0271)
   # results.mdl2[j] = mdl2_fun(train_j, test_j, test_jy)
+  set.seed(0271)
   results.mdl3[j] = mdl3_fun(train_j, test_j, test_jy)
 }
 
@@ -87,6 +93,59 @@ mdl1_fun = function(train, test, test_y){
   return(sqrt(mean((abs(pred_select) - log(test_y$Sale_Price))^2)))
 }
 
+mdl15_fun = function(train, test, test_y){
+  train[, 83] = log(train[, 83])
+  y = as.numeric(unlist(train[83]))
+  X = train[, -c(1, 83)]
+  test$PID = NULL
+  
+  X = subset(X, select = -c(Garage_Yr_Blt, Street, Utilities,  Condition_2, Roof_Matl, 
+                            Heating, Pool_QC, Misc_Feature, Low_Qual_Fin_SF,
+                            Pool_Area, Longitude, Latitude))
+  test = subset(test, select = -c(Garage_Yr_Blt, Street, Utilities,  Condition_2, Roof_Matl, 
+                                  Heating, Pool_QC, Misc_Feature, Low_Qual_Fin_SF,
+                                  Pool_Area, Longitude,Latitude))
+  
+  winsor.vars <- c("Lot_Frontage", "Lot_Area", "Mas_Vnr_Area", "BsmtFin_SF_2", "Bsmt_Unf_SF", "Total_Bsmt_SF", "Second_Flr_SF", 'First_Flr_SF', "Gr_Liv_Area", "Garage_Area", "Wood_Deck_SF", "Open_Porch_SF", "Enclosed_Porch", "Three_season_porch", "Screen_Porch", "Misc_Val")
+  quan.value <- 0.95
+  for(var in winsor.vars){
+    tmp <- X[, var]
+    myquan <- quantile(tmp, probs = quan.value, na.rm = TRUE)
+    tmp[tmp > myquan] <- myquan
+    X[, var] <- tmp
+    
+    tmp <- test[, var]
+    myquan <- quantile(tmp, probs = quan.value, na.rm = TRUE)
+    tmp[tmp > myquan] <- myquan
+    test[, var] <- tmp
+  }
+  
+  X$train = 1
+  test$train = 0
+  full = rbind(X, test)
+  
+  full_dummies = dummy_cols(full, remove_first_dummy = T, remove_selected_columns = T)
+  X_dummies = full_dummies[full_dummies$train == 1, ]
+  test_dummies = full_dummies[full_dummies$train == 0, ]
+  
+  # X_dummies = dummy_cols(X, remove_first_dummy = T, remove_selected_columns = T)
+  # test_dummies = dummy_cols(test, remove_first_dummy = T, remove_selected_columns = T)
+  
+  X_dummies = data.matrix(X_dummies)
+  test_dummies = data.matrix(test_dummies)
+  
+  cv_select = cv.glmnet(X_dummies, y, alpha = 1)
+  sel_vars = predict(cv_select, type="nonzero", s = cv_select$lambda.1se)$X1
+  vars = colnames(X_dummies[,sel_vars])
+  fml = formula(paste0("y ~ ", paste0(vars, collapse = " + ")))
+  td = as.data.frame(test_dummies)
+  xd = as.data.frame(X_dummies)
+  output = lm(fml, data = xd)
+  
+  pred_select = predict(output, newdata = (td[, sel_vars]))
+  return(sqrt(mean((abs(pred_select) - log(test_y$Sale_Price))^2)))
+}
+
 mdl2_fun = function(train, test, test_y){
   train[, 83] = log(train[, 83])
   y = as.numeric(unlist(train[83]))
@@ -134,7 +193,9 @@ mdl3_fun = function(train, test, test_y){
   train[, 83] = log(train[, 83])
   y = as.numeric(unlist(train[83]))
   X = train[, -c(1, 83)]
-  test$PID = NULL
+  # stash PIDs for later use
+  # pids = test$PID
+  # test$PID = NULL
   
   #remove a bunch of random or repeated fatures, remove Garage YR Blt due to missing values
   X = subset(X, select = -c(Garage_Yr_Blt, Street, Utilities,  Condition_2, Roof_Matl, 
@@ -181,14 +242,11 @@ mdl3_fun = function(train, test, test_y){
   
   #select variables and create model
   t_matrix = data.matrix(train.matrix)
-  cv_select = cv.glmnet(t_matrix, y, alpha = 1)
+  cv_select = cv.glmnet(t_matrix, y, alpha = 0.8)
   sel_vars = predict(cv_select, type="nonzero", s = cv_select$lambda.1se)$X1
-  sel_vars = predict(cv_select, type="nonzero", s = cv_select$lambda.1se)$X1
-  ridge_select = glmnet(t_matrix[, sel_vars], y, lambda = cv_select$lambda.1se, alpha = 0)
+  ridge_select = glmnet(t_matrix[, sel_vars], y, lambda = cv_select$lambda.1se, alpha = 0.2)
   
   #process test data
-  # categorical.vars <- colnames(X)[
-  #   which(sapply(X, function(x) mode(x)=="character"))]
   test.matrix <- test[, !colnames(test) %in% categorical.vars, drop=FALSE]
   n.test <- nrow(test.matrix)
   for(var in categorical.vars){
@@ -205,11 +263,24 @@ mdl3_fun = function(train, test, test_y){
     test.matrix <- cbind(test.matrix, temp_test)
   }
   
-  test_select = data.matrix(test.matrix[, sel_vars])
+  #shift right due to PID in test matrix?
+  test_select = data.matrix(test.matrix[, (sel_vars+1)])
   pred_ridge = predict(ridge_select, newx = test_select)
   
   return(sqrt(mean((abs(pred_ridge) - log(test_y$Sale_Price))^2)))
 }
+
+
+
+####vizualization
+model_names = c("Dummy Cols Cheat to Ridge", "Dummy Cols Cheat to LM", 
+                "Hard Coded LM", "No Cheats to Ridge")
+results = t(cbind(results.mdl1, results.mdl15, results.mdl2, results.mdl3))
+barplot(results, beside = T, col = c(1,2,3,4))
+legend("bottomright", model_names, pch = 19, col = c(1,2,3,4))
+abline(h = 0.125, lty = 'dashed')
+abline(h = 0.135, lty = 'dashed', col = 'pink')
+
 # write the test files for later pipeline testing into features and response
 write.csv(train_j, file = "train.csv", row.names = F)
 write.csv(test_j,  file = "test.csv", row.names = F)
