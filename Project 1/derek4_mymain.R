@@ -2,16 +2,12 @@ library(glmnet)
 
 train = read.csv("train.csv", stringsAsFactors = F)
 test  = read.csv("test.csv", stringsAsFactors = F)
-true_price = read.csv("test_y.csv")
 
 #model 1 - lasso chosen predictors to elastic net
 #log transform the sale price then seperate the train data into predictor ~ response
 train[, 83] = log(train[, 83])
 y = as.numeric(unlist(train[83]))
 X = train[, -c(1, 83)]
-# stash PIDs for later use
-# pids = test$PID
-# test$PID = NULL
 
 #remove a bunch of random or repeated fatures, remove Garage YR Blt due to missing values
 X = subset(X, select = -c(Garage_Yr_Blt, Street, Utilities,  Condition_2, Roof_Matl, 
@@ -20,9 +16,13 @@ X = subset(X, select = -c(Garage_Yr_Blt, Street, Utilities,  Condition_2, Roof_M
 test = subset(test, select = -c(Garage_Yr_Blt, Street, Utilities,  Condition_2, Roof_Matl, 
                                 Heating, Pool_QC, Misc_Feature, Low_Qual_Fin_SF,
                                 Pool_Area, Longitude,Latitude))
+train2 = subset(train, select = -c(Garage_Yr_Blt, Street, Utilities,  Condition_2, Roof_Matl, 
+                                   Heating, Pool_QC, Misc_Feature, Low_Qual_Fin_SF,
+                                   Pool_Area, Longitude, Latitude))
 
-winsor.vars <- c("Lot_Frontage", "Lot_Area", "Mas_Vnr_Area", "BsmtFin_SF_2", "Bsmt_Unf_SF", "Total_Bsmt_SF", "Second_Flr_SF", 'First_Flr_SF', "Gr_Liv_Area", "Garage_Area", "Wood_Deck_SF", "Open_Porch_SF", "Enclosed_Porch", "Three_season_porch", "Screen_Porch", "Misc_Val")
-quan.value <- 0.95
+#winsorize predictors with extremely large observations
+winsor.vars = c("Lot_Frontage", "Lot_Area", "Mas_Vnr_Area", "BsmtFin_SF_2", "Bsmt_Unf_SF", "Total_Bsmt_SF", "Second_Flr_SF", 'First_Flr_SF', "Gr_Liv_Area", "Garage_Area", "Wood_Deck_SF", "Open_Porch_SF", "Enclosed_Porch", "Three_season_porch", "Screen_Porch", "Misc_Val")
+quan.value = 0.95
 for(var in winsor.vars){
   tmp <- X[, var]
   myquan <- quantile(tmp, probs = quan.value, na.rm = TRUE)

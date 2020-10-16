@@ -22,6 +22,11 @@ results.mdl1 = double(10)
 results.mdl15 = double(10)
 results.mdl2 = double(10)
 results.mdl3 = double(10)
+results.mdl4 = double(10)
+qs = seq(0.5, 1, by = 0.05)
+results.qs = double(length(qs))
+
+j = 3
 
 for(j in 1:10) {
   print(cat("Iteration ", j, "   ##############"))
@@ -38,9 +43,26 @@ for(j in 1:10) {
   # results.mdl15[j] = mdl15_fun(train_j, test_j, test_jy)
   # set.seed(0271)
   # results.mdl2[j] = mdl2_fun(train_j, test_j, test_jy)
-  set.seed(0271)
-  results.mdl3[j] = mdl3_fun(train_j, test_j, test_jy)
+  # set.seed(0271)
+  # results.mdl3[j] = mdl3_fun(train_j, test_j, test_jy)
+  for(i in 1:length(qs)){
+    print(i)
+    set.seed(0271)
+    results.qs[i] = results.qs[i] + mdl3_fun(train_j, test_j, test_jy, qs[i])
+  }
 }
+results.qs = results.qs / 10
+#winzoriation vizualitzation
+plot(results.qs,
+     col = 'dodgerblue',
+     pch = 19,
+     cex = 1.25,
+     xaxt = 'none',
+     main = "Effect of Winsorization Quantile Cut Off",
+     ylab = "Average RMSE",
+     xlab = "Quantile Cut-Off")
+axis(1, at = seq(1, length(qs)), labels = qs)
+grid()
 
 mdl1_fun = function(train, test, test_y){
   train[, 83] = log(train[, 83])
@@ -188,7 +210,7 @@ mdl2_fun = function(train, test, test_y){
   
 }
 
-mdl3_fun = function(train, test, test_y){
+mdl3_fun = function(train, test, test_y, q = 0.95){
   #log transform the sale price then seperate the train data into predictor ~ response
   train[, 83] = log(train[, 83])
   y = as.numeric(unlist(train[83]))
@@ -206,7 +228,7 @@ mdl3_fun = function(train, test, test_y){
                                   Pool_Area, Longitude,Latitude))
   
   winsor.vars <- c("Lot_Frontage", "Lot_Area", "Mas_Vnr_Area", "BsmtFin_SF_2", "Bsmt_Unf_SF", "Total_Bsmt_SF", "Second_Flr_SF", 'First_Flr_SF', "Gr_Liv_Area", "Garage_Area", "Wood_Deck_SF", "Open_Porch_SF", "Enclosed_Porch", "Three_season_porch", "Screen_Porch", "Misc_Val")
-  quan.value <- 0.95
+  quan.value <- q
   for(var in winsor.vars){
     tmp <- X[, var]
     myquan <- quantile(tmp, probs = quan.value, na.rm = TRUE)
@@ -270,7 +292,85 @@ mdl3_fun = function(train, test, test_y){
   return(sqrt(mean((abs(pred_ridge) - log(test_y$Sale_Price))^2)))
 }
 
-
+mdl4_fun = function(train, test, test_y){
+  #log transform the sale price then seperate the train data into predictor ~ response
+  train[, 83] = log(train[, 83])
+  y = as.numeric(unlist(train[83]))
+  X = train[, -c(1, 83)]
+  # stash PIDs for later use
+  # pids = test$PID
+  # test$PID = NULL
+  
+  #remove a bunch of random or repeated fatures, remove Garage YR Blt due to missing values
+  X = subset(X, select = -c(Garage_Yr_Blt, Street, Utilities,  Condition_2, Roof_Matl, 
+                            Heating, Pool_QC, Misc_Feature, Low_Qual_Fin_SF,
+                            Pool_Area, Longitude, Latitude))
+  test = subset(test, select = -c(Garage_Yr_Blt, Street, Utilities,  Condition_2, Roof_Matl, 
+                                  Heating, Pool_QC, Misc_Feature, Low_Qual_Fin_SF,
+                                  Pool_Area, Longitude,Latitude))
+  train2 = subset(train, select = -c(Garage_Yr_Blt, Street, Utilities,  Condition_2, Roof_Matl, 
+                                     Heating, Pool_QC, Misc_Feature, Low_Qual_Fin_SF,
+                                     Pool_Area, Longitude, Latitude))
+  
+  winsor.vars <- c("Lot_Frontage", "Lot_Area", "Mas_Vnr_Area", "BsmtFin_SF_2", "Bsmt_Unf_SF", "Total_Bsmt_SF", "Second_Flr_SF", 'First_Flr_SF', "Gr_Liv_Area", "Garage_Area", "Wood_Deck_SF", "Open_Porch_SF", "Enclosed_Porch", "Three_season_porch", "Screen_Porch", "Misc_Val")
+  quan.value <- 0.95
+  for(var in winsor.vars){
+    tmp <- X[, var]
+    myquan <- quantile(tmp, probs = quan.value, na.rm = TRUE)
+    tmp[tmp > myquan] <- myquan
+    X[, var] <- tmp
+    
+    tmp <- test[, var]
+    myquan <- quantile(tmp, probs = quan.value, na.rm = TRUE)
+    tmp[tmp > myquan] <- myquan
+    test[, var] <- tmp
+  }
+  
+  #process training data
+  categorical.vars <- colnames(X)[
+    which(sapply(X, function(x) mode(x)=="character"))]
+  train.matrix <- X[, !colnames(X) %in% categorical.vars, drop=FALSE]
+  saved_levels = list()
+  n.train <- nrow(train.matrix)
+  for(var in categorical.vars){
+    mylevels <- sort(unique(X[, var]))
+    saved_levels[[var]] = mylevels
+    m <- length(mylevels)
+    m <- ifelse(m>2, m, 1)
+    tmp.train <- matrix(0, n.train, m)
+    col.names <- NULL
+    for(j in 1:m){
+      tmp.train[X[, var]==mylevels[j], j] <- 1
+      col.names <- c(col.names, paste(var, '_', mylevels[j], sep=''))
+    }
+    colnames(tmp.train) <- col.names
+    train.matrix <- cbind(train.matrix, tmp.train)
+  }
+  
+  print('before randomforest')
+  # rf_fit1 = randomForest(Sale_Price ~ ., train2, ntree=1000)
+  rf_fit1 = randomForest(y ~ ., X, ntree=1000)
+  print('after randomforest')
+  
+  test.matrix <- test[, !colnames(test) %in% categorical.vars, drop=FALSE]
+  n.test <- nrow(test.matrix)
+  for(var in categorical.vars){
+    mylevels = saved_levels[[var]]
+    m = length(mylevels)
+    m <- ifelse(m>2, m, 1)
+    temp_test <- matrix(0, n.test, m)
+    col.names <- NULL
+    for(j in 1:m){
+      temp_test[test[, var]==mylevels[j], j] <- 1
+      col.names <- c(col.names, paste(var, '_', mylevels[j], sep=''))
+    }
+    colnames(temp_test) <- col.names
+    test.matrix <- cbind(test.matrix, temp_test)
+  }
+  
+  rf_pred1 = predict(rf_fit1, test)
+  sqrt(mean((log(true_price$Sale_Price) - rf_pred1)^2))
+}
 
 ####vizualization
 model_names = c("Dummy Cols Cheat to Ridge", "Dummy Cols Cheat to LM", 
