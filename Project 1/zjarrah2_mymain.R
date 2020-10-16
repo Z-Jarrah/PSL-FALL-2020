@@ -1,31 +1,19 @@
-library(glmnet)
-library(randomForest)
+#import and setup train/test data for a specifc train/test set
 library(caret)
+library(randomForest)
+library(xgboost)
+results.mdl1 = double(10)
+results.mdl2 = double(10)
+
 train = read.csv("train.csv", stringsAsFactors = F)
 test  = read.csv("test.csv", stringsAsFactors = F)
 true_price = read.csv("test_y.csv")
 
 #model 1 - lasso chosen predictors to elastic net
-#log transform the sale price then separate the train data into predictor ~ response
+#log transform the sale price then seperate the train data into predictor ~ response
 train[, 83] = log(train[, 83])
 y = as.numeric(unlist(train[83]))
 X = train[, -c(1, 83)]
-# stash PIDs for later use
-# pids = test$PID
-# test$PID = NULL
-
-#remove a bunch of random or repeated features, remove Garage YR Blt due to missing values
-X = subset(X, select = -c(Garage_Yr_Blt, Street, Utilities,  Condition_2, Roof_Matl, 
-                          Heating, Pool_QC, Misc_Feature, Low_Qual_Fin_SF,
-                          Pool_Area, Longitude, Latitude))
-
-train2 = subset(train, select = -c(Garage_Yr_Blt, Street, Utilities,  Condition_2, Roof_Matl, 
-                          Heating, Pool_QC, Misc_Feature, Low_Qual_Fin_SF,
-                          Pool_Area, Longitude, Latitude))
-
-test = subset(test, select = -c(Garage_Yr_Blt, Street, Utilities,  Condition_2, Roof_Matl, 
-                                Heating, Pool_QC, Misc_Feature, Low_Qual_Fin_SF,
-                                Pool_Area, Longitude,Latitude))
 
 winsor.vars <- c("Lot_Frontage", "Lot_Area", "Mas_Vnr_Area", "BsmtFin_SF_2", "Bsmt_Unf_SF", "Total_Bsmt_SF", "Second_Flr_SF", 'First_Flr_SF', "Gr_Liv_Area", "Garage_Area", "Wood_Deck_SF", "Open_Porch_SF", "Enclosed_Porch", "Three_season_porch", "Screen_Porch", "Misc_Val")
 quan.value <- 0.95
@@ -62,50 +50,6 @@ for(var in categorical.vars){
   train.matrix <- cbind(train.matrix, tmp.train)
 }
 
-"Sale_Price" %in% names(train2) 
-"Sale_Price" %in% names(test) 
-str(train)
-
-#RandomForest: Manual
-rf_fit1 = randomForest(Sale_Price~., train2, ntree=100000)
-rf_pred1 = predict(rf_fit1, test)
-sqrt(mean((log(true_price$Sale_Price) - rf_pred1)^2))
-
-
-#Using caret library for randomForest
-control = trainControl(method='repeatedcv',
-                        number=10,
-                        repeats=3)
-mtry = sqrt(ncol(train2))
-tunegrid = expand.grid(.mtry=mtry)
-rf_fit2 = train(Sale_Price~., data=train2, method='rf', metric='RMSE',
-      tuneGrid=tunegrid, trControl=control)
-
-rf_pred2 = predict(rf_fit2, newdata=head(test))
-sqrt(mean((log(true_price$Sale_Price) - rf_pred2)^2))
-
-
-#Using caret library for boosting
-fitControl = trainControl(## 10-fold CV
-  method = "repeatedcv",
-  number = 10,
-  ## repeated ten times
-  repeats = 10)
-
-gbm1 = train(Sale_Price ~ ., data = train2, 
-                 method = "gbm", 
-                 trControl = fitControl,
-                 ## This last option is actually one
-                 ## for gbm() that passes through
-                 verbose = FALSE)
-
-gbm_pred1 = predict(gbm1, newdata=test)
-
-sqrt(mean((log(true_price$Sale_Price) - gbm_pred1)^2))
-
-
-
-
 #process test data
 test.matrix <- test[, !colnames(test) %in% categorical.vars, drop=FALSE]
 n.test <- nrow(test.matrix)
@@ -123,11 +67,25 @@ for(var in categorical.vars){
   test.matrix <- cbind(test.matrix, temp_test)
 }
 
-#shift right due to PID in test matrix?
-test_select = data.matrix(test.matrix[, (sel_vars+1)])
-pred_rf = predict(rf_fit1, test)
+set.seed(123)
+xgb.model <- xgboost(data = as.matrix(train.matrix), 
+                     label = y, max_depth = 6,
+                     eta = 0.05, nrounds = 5000,
+                     subsample = 0.5,
+                     verbose = FALSE)
 
-# write submission file
-submission1 = cbind(PID = test$PID, Sale_Price = pred_rf)
+test.matrix$PID = NULL
+test_mat = data.matrix(test.matrix)
+xgb_pred = predict(xgb.model, newdata=test_mat)
+
+sqrt(mean((log(true_price$Sale_Price) - xgb_pred)^2))
+
+
+
+#shift right due to PID in test matrix?
+pred_xgb = exp(xgb_pred)
+
+#write submission file
+submission1 = cbind(PID = test$PID, Sale_Price = pred_xgb)
 colnames(submission1) = c("PID", "Sale_Price")
-write.csv(submission1, file = "mysubmission1_zj.txt", row.names = F)
+write.csv(submission1, file = "mysubmission2.txt", row.names = F)
