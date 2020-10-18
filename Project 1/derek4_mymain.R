@@ -79,6 +79,22 @@ for(var in categorical.vars){
   test.matrix <- cbind(test.matrix, temp_test)
 }
 
+set.seed(9618)
+xgb.model <- xgboost(data = as.matrix(train.matrix), 
+                     label = y, max_depth = 6,
+                     eta = 0.05, nrounds = 5000,
+                     subsample = 0.5,
+                     verbose = FALSE)
+
+test.matrix$PID = NULL
+test_mat = data.matrix(test.matrix)
+xgb_pred = predict(xgb.model, newdata=test_mat)
+
+sqrt(mean((log(true_price$Sale_Price) - xgb_pred)^2))
+
+
+pred_xgb = exp(xgb_pred)
+
 #shift right due to PID in test matrix?
 test_select = data.matrix(test.matrix[, (sel_vars+1)])
 pred_ridge = exp(predict(ridge_select, newx = test_select))

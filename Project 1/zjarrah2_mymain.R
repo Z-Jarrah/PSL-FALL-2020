@@ -67,7 +67,7 @@ for(var in categorical.vars){
   test.matrix <- cbind(test.matrix, temp_test)
 }
 
-set.seed(123)
+set.seed(9618)
 xgb.model <- xgboost(data = as.matrix(train.matrix), 
                      label = y, max_depth = 6,
                      eta = 0.05, nrounds = 5000,
