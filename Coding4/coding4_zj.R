@@ -1,8 +1,20 @@
 library(mclust)
 
+# initial values
+# Just for testing
+pi1 = 0.5
+pi2 = 0.5
+mu1 = -0.01
+mu2 = 0.01
+sigma1 = sqrt(0.01)
+sigma2 = sqrt(0.02)
+
 Estep <- function (data , G , para ) {
   # Your Code
+  # Compute 
+  
   # Return the n-by -G probability matrix
+  
 }
 Mstep <- function (data , G , para , post.prob ) {
   # Your Code
@@ -30,8 +42,8 @@ myEM <- function (data , itmax , G , para ) {
 
 n <- nrow ( faithful )
 # initialize parameters
-#set.seed(9618)
-set.seed(234)
+set.seed(9618)
+#set.seed(234)
 Z <- matrix (0 , n , 2)
 Z [ sample (1: n , 120) , 1] <- 1
 Z [ , 2] <- 1 - Z [ , 1]
