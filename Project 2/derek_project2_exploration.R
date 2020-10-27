@@ -44,3 +44,29 @@ for(i in 1:n_folds){
 
 ##################
 ######evaluation code
+######dont need for actual submission only mymain.R
+source("mymain.R")
+train = suppressMessages(read_csv('train_ini.csv'))
+test = suppressMessages(read_csv('test.csv'))
+
+num_folds = 10
+wae = rep(0, num_folds)
+
+for(t in 1:num_folds){
+  test_pred = mypredict()
+  
+  fold_file = paste0('fold_', t, '.csv')
+  new_train = read_csv(fold_file, col_types = cols())
+  
+  ###doesnt work correctly until the output from mypredict is correctly structured
+  scoring_tbl = left_join(new_train, test_pred, by = c('Date', 'Store', 'Dept'))
+  
+  actuals = scoring_tbl$Weekly_Sales
+  preds = scoring_tbl$Weekly_Pred
+  preds[is.na(preds)] = 0
+  weights = if_else(scoring_tbl$IsHoliday, 5, 1)
+  wae[t] = sum(weights * abs(actuals - pred)) / sum(weights)
+}
+
+print(wae)
+mean(wae)
