@@ -3,7 +3,7 @@ testIDs = read.table("project1_testIDs.dat")
 data    = read.csv("Ames_data.csv", stringsAsFactors = F)
 
 for(j in 1:10) {
-  cat("Split ", j, "   ##############")
+  cat("Split ", j, "   ##############", '\n')
   
   #read in splits
   train = data[-testIDs[, j],]

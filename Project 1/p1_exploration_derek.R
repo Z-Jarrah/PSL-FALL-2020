@@ -14,38 +14,40 @@ results.rforest = double(10)
 qs = seq(0.5, 1, by = 0.05)
 results.qs = double(length(qs))
 
+#testing mymain.R file
+testIDs = read.table("project1_testIDs.dat")
+data    = read.csv("Ames_data.csv", stringsAsFactors = F)
+
+#for testing models in file
 for(j in 1:10) {
   print(cat("Iteration ", j, "   ##############"))
-  testIDs = read.table("project1_testIDs.dat")
-  data    = read.csv("Ames_data.csv", stringsAsFactors = F)
   train_j = data[-testIDs[, j],]
   test_j  = data[testIDs[, j],-83]
   test_jy = data[testIDs[, j], c(1, 83)]
   
-  
-  set.seed(0271)
-  print("Lasso")
-  results.lasso[j] = lasso_fun(train_j, test_j, test_jy)
-  
-  set.seed(0271)
-  print("Ridge")
-  results.ridge[j] = ridge_fun(train_j, test_j, test_jy)
-  
+  # set.seed(0271)
+  # print("Lasso")
+  # results.lasso[j] = lasso_fun(train_j, test_j, test_jy)
+  # 
+  # set.seed(0271)
+  # print("Ridge")
+  # results.ridge[j] = ridge_fun(train_j, test_j, test_jy)
+  # 
   set.seed(0271)
   print("Elastic Net")
   results.select[j] = lasso_select_elasticnet_fun(train_j, test_j, test_jy)
   
-  set.seed(0271)
-  print("SLR")
-  results.slr[j] = slr_fun(train_j, test_j, test_jy)
-  
-  set.seed(0271)
-  print("XGB")
-  results.xgb[j] = xgb_fun(train_j, test_j, test_jy, rounds = 500)
-  
-  set.seed(0271)
-  print("Random Forest")
-  results.rforest[j] = rand_forest_fun(train_j, test_j, test_jy, rounds = 500)
+  # set.seed(0271)
+  # print("SLR")
+  # results.slr[j] = slr_fun(train_j, test_j, test_jy)
+  # 
+  # set.seed(0271)
+  # print("XGB")
+  # results.xgb[j] = xgb_fun(train_j, test_j, test_jy, rounds = 500)
+  # 
+  # set.seed(0271)
+  # print("Random Forest")
+  # results.rforest[j] = rand_forest_fun(train_j, test_j, test_jy, rounds = 500)
   
   #for winsorization scores
   # for(i in 1:length(qs)){
