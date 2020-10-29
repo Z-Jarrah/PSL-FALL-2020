@@ -1,0 +1,63 @@
+---
+title: "Coding4 PSL Fall 2020"
+author: "Derek Chapman, Zeed Jarrah"
+date: "10/28/2020"
+output: html_document
+---
+
+
+
+Derivatives:
+
+## Derivative (Parts and steps of the problem)
+
+List the objective function: Yes
+-- Give the expression of \sum_i log f(x_i | theta), the so-called incomplete likelihood or the marginal likelihood (of x), i.e., equation (8). This is the objective function we aim to maximize, but it's difficult to directly maximize this likelihood due to the sum inside the log, so we use the EM algorithm.
+
+Derivatives with regards to pi, mu, and Sigma: Yes
+-- State what the parameters, i.e., elements of theta, are. Introduce each symbol in your theta, which should contain the (pi 1 + 2) mixing weights, mean vectors, and a shared 2-by-2 covariance matrix.
+
+and finally the formulae for the MLE for pi, mu, and Sigma: Yes
+
+
+
+### Incomplete Log-Likelihood
+
+We would like to calculate the incomplete data log likelihood since we do not have the true labels to make a supervised learning model (such as in Naive Bayes).  However this is difficult due to the log sandwich between two summations.
+$$
+\ell(\theta) = \sum_n log \sum_{z_n = 1}^K \pi(z_n) N(x_n | z_n, \mu(z_n), \Sigma)
+$$
+
+
+### Adjusted Log-Likelihood
+
+Because of this we calculate our likelihood using a latent **indicator** variable $z_n$ that typically begins as a random assignment and then is refined throught the EM steps.
+$$
+\ell_c(\theta) = log \prod_n p(z_n | \pi) p(x_n|z_n, \theta)
+$$
+
+### Parameters
+
+Here our $\theta$ represents the parameters of our model.  Our label means/centers ($\mu$), our label mixing weights ($\pi$), and our variance ($\Sigma$).  Due to the type of our model we have a means and mixing weights for each label but use a common co-variance matrix.  In this case it will be a 2x2 matrix since we have 2 labels/clusters.
+
+Our initial mixing weights are a simple ratio:
+$$
+\pi_k = \frac{1}{N}\sum_{k=1}^K
+$$
+
+
+## E-Step
+
+During the E-step we recalculate the latent indicator variables given the current probabilities 
+
+Equation 21
+
+
+
+Then during the M-Step we recalculate our base parameters each time based on the current estimated latent variable groupings.
+
+Equation 22 and 27
+
+
+
+Mixing Weights
