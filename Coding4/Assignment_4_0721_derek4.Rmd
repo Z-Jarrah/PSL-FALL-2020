@@ -8,27 +8,170 @@ output:
     theme: yeti
 ---
 
-```{r, setup}
+```{r, setup, message=FALSE}
 library(mclust)
+library(kableExtra) #for table at end
 options(digits = 7)
+```
+
+## Our EM Algorithm
+
+#### E-Step
+
+```{r, e-step}
+Estep <- function (data, G, para) {
+  prob1_vec = para$prob[1]*densityMvNorm(faithful, para$mean[,1], para$Sigma)/
+    (para$prob[1]*densityMvNorm(faithful, para$mean[,1], para$Sigma) + 
+     para$prob[2]*densityMvNorm(faithful, para$mean[,2], para$Sigma))
+
+  # Return the n-by -G probability matrix
+  return (cbind(prob1_vec, 1-prob1_vec))
+}
+```
+
+#### M-Step
+
+```{r, m-step}
+Mstep <- function (data, G, para, post.prob) {
+  prob = apply(post.prob, 2, mean)
+  
+  rnk_Xn1 = post.prob[,1]*faithful
+  mean1   = apply(rnk_Xn1, 2,sum)/apply(post.prob,2,sum)[1]
+  rnk_Xn2 = post.prob[,2]*faithful
+  mean2   = apply(rnk_Xn2, 2,sum)/apply(post.prob,2,sum)[2]
+  updated_mean = cbind(mean1, mean2)
+  
+  mat_temp1 = matrix(rep(0, 4), nrow=2)
+  
+  for (i in 1:nrow(faithful)) {
+    x1 = post.prob[i,1] * (t(faithful[i,]-mean1) %*% t(t(faithful[i,]-mean1)))
+    x2 = post.prob[i,2] * (t(faithful[i,]-mean2) %*% t(t(faithful[i,]-mean2)))
+    
+    mat_temp1 = mat_temp1 + x1 + x2
+  }
+  
+  covar_matrix = mat_temp1/nrow(faithful)
+
+  # Return the updated parameters
+  return(list(prob = prob, mean = updated_mean, Sigma = covar_matrix))
+}
+```
+
+#### EM Cycle
+
+```{r, em-loop}
+myEM <- function (data, itmax, G, para){
+  for(t in 1: itmax ) {
+    post.prob = Estep (data , G , para )
+    para = Mstep (data, G, para, post.prob)
+  }
+  return(para)
+}
+```
+
+#### Our Multi-variate Density Function
+
+```{r our-dmvnorm}
+densityMvNorm <- function (x, mean, sigma, log = FALSE) 
+{
+  mean = as.vector(mean)
+
+  if (missing(sigma)) sigma = diag(ncol(x))
+  
+  if (NCOL(x) != NCOL(sigma)) {
+    stop("x and sigma have non-conforming size")
+  }
+  if (!isSymmetric(sigma, tol = sqrt(.Machine$double.eps), 
+                   check.attributes = FALSE)) {
+    stop("sigma must be a symmetric matrix")
+  }
+  if (length(mean) != NROW(sigma)) {
+    print(NCOL(mean))
+    print(NROW(sigma))
+    stop("mean and sigma have non-conforming size")
+  }
+  
+  ## invert matrix before hand so only do this once
+  prec = solve(sigma)
+  distval = mahalanobis(x, center = mean, cov = prec, inverted = TRUE)
+  logdet = sum(log(eigen(sigma, symmetric = TRUE, only.values = TRUE)$values))
+  logretval = -(ncol(x) * log(2 * pi) + logdet + distval)/2
+  
+  if (log) 
+    return(unname(logretval))
+  else 
+    return(exp(logretval))
+}
+```
+
+Based on [csgillespie's custom dmvnorm function](https://github.com/csgillespie/abcpmcmc/blob/master/R/dmvnorm.R)
+
+With significant help from the actual mclust function found at: https://rdrr.io/cran/mclust/src/R/util.R
+
+## Testing Our Functions
+
+#### Setup
+
+```{r, setup-test}
+set.seed(9618)
+
+# initialize parameters
+n = nrow(faithful)
+Z = matrix (0 , n , 2)
+Z[sample(1:n, 120), 1] = 1
+Z[, 2] = 1 - Z[, 1]
+
+ini0 <- mstep( modelName ="EEE", faithful , Z )$parameters
+para0 <- list ( prob = ini0$pro, 
+                mean = ini0$mean,
+                Sigma = ini0$variance$Sigma )
+```
+
+#### Results from our function and mclust
+
+```{r get-results}
+# Output from our EM alg
+my_out = myEM(data = faithful, 
+              itmax = 10, G= 2, para = para0)
+
+# Output from mclust
+Rout = em(modelName = "EEE", 
+          data = faithful,
+          control = emControl(eps = 0, tol = 0, itmax = 10),
+          parameters = ini0)$parameters
+```
+
+#### Compare Results
+
+```{r, results}
+probs = cbind(my_out$prob, Rout$pro)
+colnames(probs) = c("Our EM", "mclust")
+rownames(probs) = c("Cluster 1", "Cluster 2")
+
+knitr::kable(probs, format = 'html', align = 'c', caption = "Results Comparison") %>%
+  kable_styling(bootstrap_options = "striped",
+                full_width = F, font_size = 18,
+                position = 'center')
 ```
 
 
 
 ## Derivatives (Parts and steps of the problem)
 
+### Complete Data Log-Likelihood
 
+We would like to calculate the true complete log-likelihood but that is not possible since we do not have the true labels to make a supervised learning model (such as in Naive Bayes).  Instead we use a latent *indicator* variable $z_n$ that typically begins as a random assignment and then is refined throughout the EM steps.
+$$
+\ell_c(\theta) = \log \prod_n p(z_n | \pi) p(x_n|z_n, \theta)
+$$
 
-Derivatives with regards to pi, mu, and Sigma: Yes
--- State what the parameters, i.e., elements of theta, are. Introduce each symbol in your theta, which should contain the (pi 1 + 2) mixing weights, mean vectors, and a shared 2-by-2 covariance matrix.
+Notice that we are essentially creating a generative model since we are looking at the probability that data point $x_n$ is created based on the assigned label and current parameters $\theta$:  $p(x_n | z_n = k, \theta)$
 
-and finally the formulae for the MLE for pi, mu, and Sigma: Yes
-
-
+We assume a Gaussian distribution for our clusters: $N(x_n|\mu_k, \Sigma)$
 
 ### Incomplete Log-Likelihood
 
-We would like to calculate the incomplete data log likelihood since we do not have the true labels to make a supervised learning model (such as in Naive Bayes).  However this is difficult due to the log being sandwiched between two summations.
+The incomplete data log likelihood is difficult to calculate directly due to the $log$ being sandwiched between two summations.
 $$
 \begin{align}
 \ell(\theta) &= \sum_n \log p(x_n | \theta) \\
@@ -36,13 +179,9 @@ $$
 \end{align}
 $$
 
+Again we are using this as a generative model since we now directly look at the conditional probability that our data point was created based on our current parameters: $p(x_n | \theta)$ which is then expanded out into a joint probability of the data point and assigned label conditioned on the current parameters: $p(x_n, z_n | \theta)$
 
-### Adjusted Log-Likelihood
 
-Because of this we calculate our likelihood using a latent *indicator* variable $z_n$ that typically begins as a random assignment and then is refined throughout the EM steps.
-$$
-\ell_c(\theta) = \log \prod_n p(z_n | \pi) p(x_n|z_n, \theta)
-$$
 
 ### Parameters
 
@@ -57,7 +196,7 @@ We can see this is the case in the starting parameters given from the `mclust` p
 
 ```{r, derivations-parms-mixing}
 ini0  = mstep(modelName = "EEE", faithful, Z)$parameters
-ini0$pro
+ini0$pro[1]
 sum(Z[, 1])/n
 ```
 
@@ -78,12 +217,13 @@ ini0$mean[, 1]
 
 ### E-Step
 
-During the E-step we recalculate the latent indicator labels given the current parameters.  Since we are using a soft encoding method our individual data points will get a probability that they are in each of the labels (partial membership).  This is different from a hard coded method such as k-means where a data point can only be part of a single class at a time.
+During the E-step we recalculate the latent indicator labels given the current parameters.  Since we are using a soft encoding method our individual data points will get a probability that they are in each of the labels (partial membership).  This is different from a hard coded method such as k-means where a data point can only be part of a single class at a time.  Because of this we need to calculate a much more intricate density function since we now have a single observation that could be part of two (or more) different distributions, we need calculate a multi-variate density function.
 
 $$
 p(z_n = k | x_n, \theta) = \frac{\pi_k N(x_n|u_k, \Sigma)}
 {\sum_j \pi_j N(x_n | \mu_j, \Sigma)}
 $$
+
 This probability is referred to as the **responsibility** that data point $n$ was generated by label/cluster $k$.  We look at the probability distribution function for an individual class label and divide this by the total probability from all of the distributions to get our probability for an individual class.
 
 
@@ -117,5 +257,5 @@ $$
 $$
 **M-Step Covariance Matrix**
 $$
-\Sigma = \frac{1}{N} \sum_n \pi_1 (x_n - \mu_1) + \pi_2 (x_n - \mu_2)
+\Sigma = \frac{1}{N} \sum_n r_{n1} (x_n - \mu_1)(x_n - \mu_1)^t + r_{n2} (x_n - \mu_2)(x_n - \mu_2)^t
 $$
