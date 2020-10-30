@@ -10,7 +10,49 @@ table(train)
 
 ##################
 ######project code
-
+# not all depts need prediction
+mypredict = function(){
+test_depts <- unique(test_fold$Dept)
+test_pred <- NULL
+print("Debug 1")
+for(dept in test_depts) {
+  train_dept_data <- train %>% filter(Dept == dept)
+  test_dept_data <- test_fold %>% filter(Dept == dept)
+  
+  # no need to consider stores that do not need prediction
+  # or do not have training samples
+  train_stores <- unique(train_dept_data$Store)
+  test_stores <- unique(test_dept_data$Store)
+  test_stores <- intersect(train_stores, test_stores)
+  print("Before inner for loop")
+  for (store in test_stores) {
+    tmp_train <- train_dept_data %>%
+      filter(Store == store) %>%
+      mutate(Wk = ifelse(year(Date) == 2010, week(Date) - 1, week(Date))) %>%
+      mutate(Yr = year(Date))
+    tmp_test <- test_dept_data %>%
+      filter(Store == store) %>%
+      mutate(Wk = ifelse(year(Date) == 2010, week(Date) - 1, week(Date))) %>%
+      mutate(Yr = year(Date))
+    
+    tmp_train$Wk = factor(tmp_train$Wk, levels = 1:52)
+    tmp_test$Wk = factor(tmp_test$Wk, levels = 1:52)
+    
+    train_model_matrix <- model.matrix( ~ Yr + Wk, tmp_train)
+    test_model_matrix <- model.matrix( ~ Yr + Wk, tmp_test)
+    mycoef <- lm(tmp_train$Weekly_Sales ~ train_model_matrix)$coef
+    mycoef[is.na(mycoef)] <- 0
+    tmp_pred <- mycoef[1] + test_model_matrix %*% mycoef[-1]
+    
+    tmp_test <- tmp_test %>%
+      mutate(Weekly_Pred = tmp_pred[, 1]) %>%
+      select(-Wk,-Yr)
+    test_pred <- test_pred %>% bind_rows(tmp_test)
+  }
+  print("Out of inner for loop")
+}
+return(test_pred)
+}
 ##################
 ######setup files - wont be needed for actual submission
 library(lubridate)
@@ -49,17 +91,19 @@ source("mymain.R")
 train = suppressMessages(read_csv('train_ini.csv'))
 test = suppressMessages(read_csv('test.csv'))
 
-num_folds = 10
+num_folds = 2
 wae = rep(0, num_folds)
 
 for(t in 1:num_folds){
   test_pred = mypredict()
+  print("past predict")
   
   fold_file = paste0('fold_', t, '.csv')
   new_train = read_csv(fold_file, col_types = cols())
   
   ###doesnt work correctly until the output from mypredict is correctly structured
-  scoring_tbl = left_join(new_train, test_pred, by = c('Date', 'Store', 'Dept'))
+  print("Debug: Before scoring table")
+  scoring_tbl = merge(new_train, test_pred, by = c('Date', 'Store', 'Dept'))
   
   actuals = scoring_tbl$Weekly_Sales
   preds = scoring_tbl$Weekly_Pred
