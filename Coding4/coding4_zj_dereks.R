@@ -1,5 +1,37 @@
 library(mclust)
 options(digits = 7)
+# === Helper Function ===
+densityMvNorm = function (x, mean, sigma, log = FALSE) 
+{
+  ## takes a matrix of means rather than a single vector
+  if (missing(sigma)) sigma = diag(ncol(x))
+  
+  if (NCOL(x) != NCOL(sigma)) {
+    stop("x and sigma have non-conforming size")
+  }
+  if (!isSymmetric(sigma, tol = sqrt(.Machine$double.eps), 
+                   check.attributes = FALSE)) {
+    stop("sigma must be a symmetric matrix")
+  }
+  if (NCOL(mean) != NROW(sigma)) {
+    stop("mean and sigma have non-conforming size")
+  }
+  ## invert matrix before hand so only do this once
+  prec = solve(sigma)
+  means = lapply(1:dim(mean)[1],function(i){mean[i,]})
+  distval = do.call(rbind, 
+                    mclapply(means, 
+                             mahalanobis,x = x, cov = prec,inverted = TRUE))
+  logdet = sum(log(eigen(sigma, symmetric = TRUE, only.values = TRUE)$values))
+  logretval = -(ncol(x) * log(2 * pi) + logdet + distval)/2
+  
+  if (log) 
+    return(logretval)
+  else 
+    return(exp(logretval))
+}
+# =======================
+
 
 # === E-step ===
 #Prob of G=1 given obs
@@ -16,7 +48,7 @@ options(digits = 7)
 
 Estep <- function (data , G , para ) {
   # Your Code
-  prob1_vec = para$prob[1]*dmvnorm(faithful, para$mean[,1], para$Sigma)/
+  prob1_vec = para$prob[1]*densityMvNorm(faithful, para$mean, para$Sigma)/
     (para$prob[1]*dmvnorm(faithful, para$mean[,1], para$Sigma) + para$prob[2]*dmvnorm(faithful, para$mean[,2], para$Sigma))
   
   # prob2_vec = 1 - prob1_vec
