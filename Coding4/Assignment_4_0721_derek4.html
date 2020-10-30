@@ -925,23 +925,23 @@ Cluster 2
 </div>
 <div id="derivatives-parts-and-steps-of-the-problem" class="section level2">
 <h2>Derivatives (Parts and steps of the problem)</h2>
-<p>Derivatives with regards to pi, mu, and Sigma: Yes – State what the parameters, i.e., elements of theta, are. Introduce each symbol in your theta, which should contain the (pi 1 + 2) mixing weights, mean vectors, and a shared 2-by-2 covariance matrix.</p>
-<p>?? and finally the formulae for the MLE for pi, mu, and Sigma: Yes</p>
+<div id="complete-data-log-likelihood" class="section level3">
+<h3>Complete Data Log-Likelihood</h3>
+<p>We would like to calculate the true complete log-likelihood but that is not possible since we do not have the true labels to make a supervised learning model (such as in Naive Bayes). Instead we use a latent <em>indicator</em> variable <span class="math inline">\(z_n\)</span> that typically begins as a random assignment and then is refined throughout the EM steps. <span class="math display">\[
+\ell_c(\theta) = \log \prod_n p(z_n | \pi) p(x_n|z_n, \theta)
+\]</span></p>
+<p>Notice that we are essentially creating a generative model since we are looking at the probability that data point <span class="math inline">\(x_n\)</span> is created based on the assigned label and current parameters <span class="math inline">\(\theta\)</span>: <span class="math inline">\(p(x_n | z_n = k, \theta)\)</span></p>
+<p>We assume a Gaussian distribution for our clusters: <span class="math inline">\(N(x_n|\mu_k, \Sigma)\)</span></p>
+</div>
 <div id="incomplete-log-likelihood" class="section level3">
 <h3>Incomplete Log-Likelihood</h3>
-<p>We would like to calculate the incomplete data log likelihood since we do not have the true labels to make a supervised learning model (such as in Naive Bayes). However this is difficult due to the log being sandwiched between two summations. <span class="math display">\[
+<p>The incomplete data log likelihood is difficult to calculate directly due to the <span class="math inline">\(log\)</span> being sandwiched between two summations. <span class="math display">\[
 \begin{align}
 \ell(\theta) &amp;= \sum_n \log p(x_n | \theta) \\
 &amp;= \sum_n \log \sum_{z_n = 1}^K \pi(z_n) N(x_n | z_n, \mu(z_n), \Sigma)
 \end{align}
 \]</span></p>
-</div>
-<div id="adjusted-log-likelihood" class="section level3">
-<h3>Adjusted Log-Likelihood</h3>
-<p>Because of this we calculate our likelihood using a latent <em>indicator</em> variable <span class="math inline">\(z_n\)</span> that typically begins as a random assignment and then is refined throughout the EM steps. <span class="math display">\[
-\ell_c(\theta) = \log \prod_n p(z_n | \pi) p(x_n|z_n, \theta)
-\]</span></p>
-<p>More details-</p>
+<p>Again we are using this as a generative model since we now directly look at the conditional probability that our data point was created based on our current parameters: <span class="math inline">\(p(x_n | \theta)\)</span> which is then expanded out into a joint probability of the data point and assigned label conditioned on the current parameters: <span class="math inline">\(p(x_n, z_n | \theta)\)</span></p>
 </div>
 <div id="parameters" class="section level3">
 <h3>Parameters</h3>
@@ -951,8 +951,8 @@ Cluster 2
 \]</span></p>
 <p>We can see this is the case in the starting parameters given from the <code>mclust</code> package:</p>
 <div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>ini0  <span class="ot">=</span> <span class="fu">mstep</span>(<span class="at">modelName =</span> <span class="st">&quot;EEE&quot;</span>, faithful, Z)<span class="sc">$</span>parameters</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>ini0<span class="sc">$</span>pro</span></code></pre></div>
-<pre><code>## [1] 0.4411765 0.5588235</code></pre>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>ini0<span class="sc">$</span>pro[<span class="dv">1</span>]</span></code></pre></div>
+<pre><code>## [1] 0.4411765</code></pre>
 <div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sum</span>(Z[, <span class="dv">1</span>])<span class="sc">/</span>n</span></code></pre></div>
 <pre><code>## [1] 0.4411765</code></pre>
 <p>The initial <strong>centers</strong> can be either created by selecting a random datapoint that was giving a starting assignment to that label or by taking the mean from every included datapoint.</p>
@@ -993,7 +993,7 @@ p(z_n = k | x_n, \theta) = \frac{\pi_k N(x_n|u_k, \Sigma)}
 \mu_k = \frac{\sum_n r_{nk} x_n}{\sum_n r_{nk}}
 \]</span> <strong>M-Step Covariance Matrix</strong> <span class="math display">\[
 \Sigma = \frac{1}{N} \sum_n r_{n1} (x_n - \mu_1)(x_n - \mu_1)^t + r_{n2} (x_n - \mu_2)(x_n - \mu_2)^t
-\]</span> More details likelihood expand expression</p>
+\]</span></p>
 </div>
 </div>
 

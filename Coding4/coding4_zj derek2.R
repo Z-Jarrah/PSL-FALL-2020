@@ -1,6 +1,6 @@
 library(mclust)
 
-densityMvNorm = function (x, mean, sigma, log = FALSE) 
+densityMvNorm <- function (x, mean, sigma, log = FALSE) 
 {
   mean = as.vector(mean)
 
@@ -88,14 +88,20 @@ para0 <- list ( prob = ini0$pro,
                 Sigma = ini0$variance$Sigma )
 
 # Output from my EM alg
-my_out = myEM(data = faithful, itmax = 10, G= 2, para = para0)
+my_out = myEM(data = faithful, 
+              itmax = 10, G= 2, para = para0)
 
 # Output from mclust
-Rout = em ( modelName = "EEE", data = faithful ,
-             control = emControl( eps =0 , tol =0 , itmax = 10) ,
-             parameters = ini0 )$parameters
+Rout = em(modelName = "EEE", 
+          data = faithful,
+          control = emControl(eps = 0, tol = 0, itmax = 10),
+          parameters = ini0)$parameters
 
 probs = cbind(my_out$prob, Rout$pro)
-colnames(probs) = c("My EM", "mclust")
+colnames(probs) = c("Our EM", "mclust")
 rownames(probs) = c("Cluster 1", "Cluster 2")
 probs
+
+knitr::kable(probs, 'html', align = 'c', digits = 7, caption = "Results Comparison") %>% kable_styling(bootstrap_options = "striped",
+                full_width = F, font_size = 12,
+                position = 'center')
