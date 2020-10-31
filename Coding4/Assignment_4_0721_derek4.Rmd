@@ -1,6 +1,6 @@
 ---
 title: "Coding4 PSL Fall 2020"
-author: "Derek Chapman (derek4), Zeed Jarrah (􏰣zjarrah2)"
+author: "Derek Chapman (derek4), Zeed Jarrah (zjarrah2)"
 date: "10/28/2020"
 output: 
   html_document: 
