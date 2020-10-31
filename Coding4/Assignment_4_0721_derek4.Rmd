@@ -202,7 +202,7 @@ sum(Z[, 1])/n
 
 
 
-The initial **centers** can be either created by selecting a random datapoint that was giving a starting assignment to that label or by taking the mean from every included datapoint.
+The initial **centers** can either be created by selecting a random datapoint that was giving a starting assignment to that label or by taking the mean from every assigned datapoint.
 
 The `mclust` package appears to use the mean of the starting assignments for each label.  Again we can check that this is the case using the starting assignments for the first cluster as an example:
 
@@ -231,6 +231,18 @@ This probability is referred to as the **responsibility** that data point $n$ wa
 ### M-Step
 
 Then during the M-Step we recalculate our base parameters each time based on the current estimated latent variable groupings.  We start with our generic objective function trying to maximize the log-likelihood given the estimated parameters.
+```{text}
+$$
+\begin{align}
+&= \sum_n \log \space p(x_n, z_n | \theta) \\
+&= \sum_n log \prod \pi_k N(x_n | u_k, \Sigma)^{I(z_n = k)} \\
+&= \sum_n \sum_k I(z_n = k) \space \log[\pi_k N(x_n | \mu_k, \Sigma)] \\
+&= \sum_n \sum_k r_{nk} \log \pi_k + \sum_n \sum_k r_{nk} \log[N(x_n | \mu_k, \Sigma)]
+\end{align}
+$$
+```
+
+
 $$
 \begin{align}
 &= \sum_n \log \space p(x_n, z_n | \theta) \\

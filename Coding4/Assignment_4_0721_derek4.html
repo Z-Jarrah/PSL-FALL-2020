@@ -976,7 +976,16 @@ p(z_n = k | x_n, \theta) = \frac{\pi_k N(x_n|u_k, \Sigma)}
 </div>
 <div id="m-step-1" class="section level3">
 <h3>M-Step</h3>
-<p>Then during the M-Step we recalculate our base parameters each time based on the current estimated latent variable groupings. We start with our generic objective function trying to maximize the log-likelihood given the estimated parameters. <span class="math display">\[
+<p>Then during the M-Step we recalculate our base parameters each time based on the current estimated latent variable groupings. We start with our generic objective function trying to maximize the log-likelihood given the estimated parameters.</p>
+<pre class="text"><code>$$
+\begin{align}
+&amp;= \sum_n \log \space p(x_n, z_n | \theta) \\
+&amp;= \sum_n log \prod \pi_k N(x_n | u_k, \Sigma)^{I(z_n = k)} \\
+&amp;= \sum_n \sum_k I(z_n = k) \space \log[\pi_k N(x_n | \mu_k, \Sigma)] \\
+&amp;= \sum_n \sum_k r_{nk} \log \pi_k + \sum_n \sum_k r_{nk} \log[N(x_n | \mu_k, \Sigma)]
+\end{align}
+$$</code></pre>
+<p><span class="math display">\[
 \begin{align}
 &amp;= \sum_n \log \space p(x_n, z_n | \theta) \\
 &amp;= \sum_n log \prod \pi_k N(x_n | u_k, \Sigma)^{I(z_n = k)} \\
