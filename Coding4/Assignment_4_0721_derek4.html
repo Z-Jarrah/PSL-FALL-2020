@@ -9,7 +9,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Derek Chapman (derek4), Zeed Jarrah (􏰣zjarrah2)" />
+<meta name="author" content="Derek Chapman (derek4), Zeed Jarrah (zjarrah2)" />
 
 <meta name="date" content="2020-10-28" />
 
@@ -747,7 +747,7 @@ summary {
 
 
 <h1 class="title toc-ignore">Coding4 PSL Fall 2020</h1>
-<h4 class="author">Derek Chapman (derek4), Zeed Jarrah (􏰣zjarrah2)</h4>
+<h4 class="author">Derek Chapman (derek4), Zeed Jarrah (zjarrah2)</h4>
 <h4 class="date">10/28/2020</h4>
 
 </div>
@@ -955,7 +955,7 @@ Cluster 2
 <pre><code>## [1] 0.4411765</code></pre>
 <div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sum</span>(Z[, <span class="dv">1</span>])<span class="sc">/</span>n</span></code></pre></div>
 <pre><code>## [1] 0.4411765</code></pre>
-<p>The initial <strong>centers</strong> can be either created by selecting a random datapoint that was giving a starting assignment to that label or by taking the mean from every included datapoint.</p>
+<p>The initial <strong>centers</strong> can either be created by selecting a random datapoint that was giving a starting assignment to that label or by taking the mean from every assigned datapoint.</p>
 <p>The <code>mclust</code> package appears to use the mean of the starting assignments for each label. Again we can check that this is the case using the starting assignments for the first cluster as an example:</p>
 <div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>t1 <span class="ot">=</span> <span class="fu">mean</span>(faithful[Z[,<span class="dv">1</span>] <span class="sc">==</span> <span class="dv">1</span>, <span class="dv">1</span>])</span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>t2 <span class="ot">=</span> <span class="fu">mean</span>(faithful[Z[,<span class="dv">1</span>] <span class="sc">==</span> <span class="dv">1</span>, <span class="dv">2</span>])</span>
@@ -977,14 +977,6 @@ p(z_n = k | x_n, \theta) = \frac{\pi_k N(x_n|u_k, \Sigma)}
 <div id="m-step-1" class="section level3">
 <h3>M-Step</h3>
 <p>Then during the M-Step we recalculate our base parameters each time based on the current estimated latent variable groupings. We start with our generic objective function trying to maximize the log-likelihood given the estimated parameters.</p>
-<pre class="text"><code>$$
-\begin{align}
-&amp;= \sum_n \log \space p(x_n, z_n | \theta) \\
-&amp;= \sum_n log \prod \pi_k N(x_n | u_k, \Sigma)^{I(z_n = k)} \\
-&amp;= \sum_n \sum_k I(z_n = k) \space \log[\pi_k N(x_n | \mu_k, \Sigma)] \\
-&amp;= \sum_n \sum_k r_{nk} \log \pi_k + \sum_n \sum_k r_{nk} \log[N(x_n | \mu_k, \Sigma)]
-\end{align}
-$$</code></pre>
 <p><span class="math display">\[
 \begin{align}
 &amp;= \sum_n \log \space p(x_n, z_n | \theta) \\
@@ -1003,6 +995,10 @@ $$</code></pre>
 \]</span> <strong>M-Step Covariance Matrix</strong> <span class="math display">\[
 \Sigma = \frac{1}{N} \sum_n r_{n1} (x_n - \mu_1)(x_n - \mu_1)^t + r_{n2} (x_n - \mu_2)(x_n - \mu_2)^t
 \]</span></p>
+</div>
+<div id="equations" class="section level3">
+<h3>Equations</h3>
+<p>All math equations typeset using <a href="https://www.latex-project.org/about/">LaTeX</a> created in <a href="https://typora.io/">Typora</a> then rendered in RStudio via the Rmarkdown document.</p>
 </div>
 </div>
 

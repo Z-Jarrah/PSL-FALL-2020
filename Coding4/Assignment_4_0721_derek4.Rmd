@@ -1,6 +1,6 @@
 ---
 title: "Coding4 PSL Fall 2020"
-author: "Derek Chapman (derek4), Zeed Jarrah (􏰣zjarrah2)"
+author: "Derek Chapman (derek4), Zeed Jarrah (zjarrah2)"
 date: "10/28/2020"
 output: 
   html_document: 
@@ -231,17 +231,6 @@ This probability is referred to as the **responsibility** that data point $n$ wa
 ### M-Step
 
 Then during the M-Step we recalculate our base parameters each time based on the current estimated latent variable groupings.  We start with our generic objective function trying to maximize the log-likelihood given the estimated parameters.
-```{text}
-$$
-\begin{align}
-&= \sum_n \log \space p(x_n, z_n | \theta) \\
-&= \sum_n log \prod \pi_k N(x_n | u_k, \Sigma)^{I(z_n = k)} \\
-&= \sum_n \sum_k I(z_n = k) \space \log[\pi_k N(x_n | \mu_k, \Sigma)] \\
-&= \sum_n \sum_k r_{nk} \log \pi_k + \sum_n \sum_k r_{nk} \log[N(x_n | \mu_k, \Sigma)]
-\end{align}
-$$
-```
-
 
 $$
 \begin{align}
@@ -271,3 +260,8 @@ $$
 $$
 \Sigma = \frac{1}{N} \sum_n r_{n1} (x_n - \mu_1)(x_n - \mu_1)^t + r_{n2} (x_n - \mu_2)(x_n - \mu_2)^t
 $$
+
+
+### Equations
+
+All math equations typeset using [LaTeX](https://www.latex-project.org/about/) created in [Typora](https://typora.io/) then rendered in RStudio via the Rmarkdown document.
