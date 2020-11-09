@@ -2,8 +2,6 @@
 #Derek Chapman (derek4)
 #Zeed Jarah (zjarrah2)
 
-
-#must return dataframe with columsn Date, Store, Dept and Weekly_Pred
 mypredict = function() {
   if (t>1){
     train <<- train %>% add_row(new_train)
@@ -30,7 +28,7 @@ mypredict = function() {
     test_stores <- intersect(train_stores, test_stores)
     if(length(test_stores) < 1){next}
     
-    ##### time series using dudes code
+    ##### time series using Joshua's code
     # Dateframe with (num_test_dates x num_stores) rows
     num_stores = length(test_stores)
     test_dates = unique(test_current$Date)
@@ -59,7 +57,7 @@ mypredict = function() {
       left_join(train_dept_ts, by = c('Date', 'Store')) %>%
       spread(Store, Weekly_Sales)
     
-    # We create a similar dataframe to hold the forecasts on
+    # Create a similar dataframe to hold the forecasts on
     # the dates in the testing window
     test_dept_ts <- test_frame %>%
       mutate(Weekly_Sales = 0) %>%
@@ -134,21 +132,21 @@ tslm.basic <- function(train, test){
   # test - An all-zeros matrix of dimension:
   #       (number of weeeks in training data) x (number of stores)
   #       The forecasts are written in place of the zeros.
-  #
-  # returns:
-  #  the test(forecast) data frame with the forecasts filled in 
   horizon <- nrow(test)
   train[is.na(train)] <- 0
   # first column is the date for each of the stores
   for(j in 2:ncol(train)){
     # grab a single store and create a 52 week time series
     s <- ts(train[, j], frequency=52)
+    
     # create model based on long term trends and weekly 'seasons
     model <- tslm(s ~ trend + season)
+    
     # forecast out desired number of weeks (testing data 'fold')
     fc <- forecast(model, h=horizon)
+    
     #fill in each of the test weeks based on the mean forecast score
     test[, j] <- as.numeric(fc$mean)
   }
-  test
+  return(test)
 }
