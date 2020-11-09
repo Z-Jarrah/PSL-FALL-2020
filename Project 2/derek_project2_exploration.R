@@ -1,12 +1,15 @@
+setwd("~/Google Drive/Geek2/UofIll/CS598_PSL/Github/PSL-FALL-2020/Project 2")
+
 library(lubridate)
 library(tidyverse)
 library(reshape2)
+library(forecast)
+
+library(progress)
 
 # project code -------
 # not all depts need prediction
 mypredict = function() {
-  print(paste0("Starting iteration: ", t))
-  
   if (t>1){
     train <<- train %>% add_row(new_train)
   }
@@ -18,9 +21,15 @@ mypredict = function() {
     select(-IsHoliday)
   
   test_depts <- unique(test_current$Dept)
-  test_pred <- NULL
+  snaive_pred  = NULL
+  naive_pred = NULL
+  tslm_pred  = NULL
+  
+  pb = progress_bar$new(total = length(test_depts))
   
   for (dept in test_depts) {
+    pb$tick()
+    
     train_dept_data <- train %>% filter(Dept == dept)
     test_dept_data <- test_current %>% filter(Dept == dept)
     
@@ -29,54 +38,134 @@ mypredict = function() {
     train_stores <- unique(train_dept_data$Store)
     test_stores <- unique(test_dept_data$Store)
     test_stores <- intersect(train_stores, test_stores)
+    if(length(test_stores) < 1){next}
     
-    for (store in test_stores) {
-      tmp_train <- train_dept_data %>%
-        filter(Store == store) %>%
-        mutate(Wk = ifelse(year(Date) == 2010, week(Date) - 1, week(Date))) %>%
-        mutate(Yr = year(Date))
-      tmp_test <- test_dept_data %>%
-        filter(Store == store) %>%
-        mutate(Wk = ifelse(year(Date) == 2010, week(Date) - 1, week(Date))) %>%
-        mutate(Yr = year(Date))
-      
-      tmp_train$Wk = factor(tmp_train$Wk, levels = 1:52)
-      tmp_test$Wk = factor(tmp_test$Wk, levels = 1:52)
-      
-      train_model_matrix <- model.matrix(~ Yr + Wk, tmp_train)
-      test_model_matrix <- model.matrix(~ Yr + Wk, tmp_test)
-      mycoef <- lm(tmp_train$Weekly_Sales ~ train_model_matrix)$coef
-      mycoef[is.na(mycoef)] <- 0
-      tmp_pred <- mycoef[1] + test_model_matrix %*% mycoef[-1]
-      
-      tmp_test <- tmp_test %>%
-        mutate(Weekly_Pred = tmp_pred[, 1]) %>%
-        select(-Wk, -Yr)
-      test_pred <- test_pred %>% bind_rows(tmp_test)
+    ##### time series using dudes code
+    # Dateframe with (num_test_dates x num_stores) rows
+    num_stores = length(test_stores)
+    test_dates = unique(test_current$Date)
+    num_test_dates = length(test_dates)
+    test_frame <- data.frame(
+      Date=rep(test_dates, num_stores),
+      Store=rep(test_stores, each=num_test_dates))
+    
+    # Create the same dataframe for the training data
+    # (num_train_dates x num_stores)
+    train_dates <- unique(train$Date)
+    num_train_dates <- length(train_dates)
+    train_frame <- data.frame(
+        Date=rep(train_dates, num_stores),
+        Store=rep(test_stores, each=num_train_dates))
+    
+    # filter for the particular department in the training data
+    train_dept_ts <- train %>%
+        filter(Dept == dept) %>%
+        select(Store, Date, Weekly_Sales)
+    
+    # Reformat so that each column is a weekly time-series for that
+    # store's department.
+    # The dataframe has a shape (num_train_dates, num_stores)
+    train_dept_ts <- train_frame %>%
+        left_join(train_dept_ts, by = c('Date', 'Store')) %>%
+        spread(Store, Weekly_Sales)
+    
+    # We create a similar dataframe to hold the forecasts on
+    # the dates in the testing window
+    test_dept_ts <- test_frame %>%
+        mutate(Weekly_Sales = 0) %>%
+        spread(Store, Weekly_Sales)
+    
+    # fully naive prediction
+    # f_naive <- naive_model(train_dept_ts, test_dept_ts)
+    # flat_f_naive = flatten_forecast(f_naive)
+    # f_naive = cbind(flat_f_naive, rep(dept, dim(flat_f_naive)[1]))
+    # colnames(f_naive) = c(colnames(f_naive)[1:2], 'Weekly_Pred', 'Dept')
+    # naive_pred <- naive_pred %>% bind_rows(f_naive)
+    # current_output <- update_forecast(test_current, f_naive, dept)
+    
+    # print(paste0("Fold ", t, "   Dept: ", dept))
+    
+    #simple tslm
+    tslm_output = tslm.basic(train_dept_ts, test_dept_ts)
+    
+    # if(t == 5){
+    #   #seasonal naive prediction
+    #   for (store in test_stores) {
+    #     tmp_train <- train_dept_data %>%
+    #       filter(Store == store) %>%
+    #       mutate(Wk = ifelse(year(Date) == 2010, week(Date) - 1, week(Date))) %>%
+    #       mutate(Yr = year(Date))
+    #     tmp_test <- test_dept_data %>%
+    #       filter(Store == store) %>%
+    #       mutate(Wk = ifelse(year(Date) == 2010, week(Date) - 1, week(Date))) %>%
+    #       mutate(Yr = year(Date))
+    #     
+    #     tmp_train$Wk = factor(tmp_train$Wk, levels = 1:52)
+    #     tmp_test$Wk = factor(tmp_test$Wk, levels = 1:52)
+    #     
+    #     train_model_matrix <- model.matrix(~ Yr + Wk, tmp_train)
+    #     test_model_matrix <- model.matrix(~ Yr + Wk, tmp_test)
+    #     mycoef <- lm(tmp_train$Weekly_Sales ~ train_model_matrix)$coef
+    #     mycoef[is.na(mycoef)] <- 0
+    #     tmp_pred <- mycoef[1] + test_model_matrix %*% mycoef[-1]
+    #     
+    #     tmp_test <- tmp_test %>%
+    #       mutate(Weekly_Pred_Snaive = tmp_pred[, 1]) %>%
+    #       select(-Wk, -Yr)
+    #     snaive_pred <- snaive_pred %>% bind_rows(tmp_test)
+    #   }
+    #   
+    #   
+    # }
+    
+    if(dim(tslm_output)[2] > 2){
+      tslm_output = shift(train, tslm_output, shift = 1)}
+    
+    tslm_simple = flatten_forecast(tslm_output)
+    tslm_simple = cbind(tslm_simple, rep(dept, dim(tslm_simple)[1]))
+    colnames(tslm_simple) = c(colnames(tslm_simple)[1:2], 'Weekly_Pred', 'Dept')
+    tslm_pred <- tslm_pred %>% bind_rows(tslm_simple)
+  }
+  
+  # if(t == 5){
+  #   print(length(tslm_pred$Weekly_Pred))
+  #   print(length(snaive_pred$Weekly_Pred_Snaive))
+  #   new_pred = (tslm_pred$Weekly_Pred + snaive_pred$Weekly_Pred_Snaive) / 2
+  #   tslm_pred$Weekly_Pred = new_pred 
+  #   }
+  
+  # create a combined object for exploration
+  # combined_output = left_join(tslm_pred, snaive_pred, by = c("Date", "Store", "Dept"))
+  
+  return(tslm_pred)
+}
+
+naive_model<- function(train_ts, test_ts){
+    num_forecasts <- nrow(test_ts)
+    train_ts[is.na(train_ts)] <- 0
+    
+    # naive forecast per store
+    for(j in 2:ncol(train_ts)){
+        store_ts <- ts(train_ts[, j], frequency=52)
+        test_ts[, j] <- naive(store_ts, num_forecasts)$mean
     }
-  }
-  
-  if(t == 5){
-    test_pred = postprocess_fold5(test_pred)
-  }
-  
-  return(test_pred)
+    test_ts
 }
 
 postprocess_fold5 = function(preds_df){
   print("runing adjust fold 5")
-  preds_df = mutate(preds_df, Weekly_Pred = ifelse(Dept == 5 & Date == "2011-12-23", Weekly_Pred * 0.55, Weekly_Pred))
-  preds_df = mutate(preds_df, Weekly_Pred = ifelse(Dept == 7 & Date == "2011-12-23", Weekly_Pred * 0.8, Weekly_Pred))
-  preds_df = mutate(preds_df, Weekly_Pred = ifelse(Dept == 6 & Date == "2011-12-23", Weekly_Pred * 0.45, Weekly_Pred))
-  preds_df = mutate(preds_df, Weekly_Pred = ifelse(Dept == 59 & Date == "2011-12-23", Weekly_Pred * 0.4, Weekly_Pred))
-  preds_df = mutate(preds_df, Weekly_Pred = ifelse(Dept == 72 & Date == "2011-12-23", Weekly_Pred * 0.85, Weekly_Pred))
+  preds_df = mutate(preds_df, Weekly_Pred_Snaive = ifelse(Dept == 5 & Date == "2011-12-23", Weekly_Pred_Snaive * 0.55, Weekly_Pred_Snaive))
+  preds_df = mutate(preds_df, Weekly_Pred_Snaive = ifelse(Dept == 7 & Date == "2011-12-23", Weekly_Pred_Snaive * 0.8, Weekly_Pred_Snaive))
+  preds_df = mutate(preds_df, Weekly_Pred_Snaive = ifelse(Dept == 6 & Date == "2011-12-23", Weekly_Pred_Snaive * 0.45, Weekly_Pred_Snaive))
+  preds_df = mutate(preds_df, Weekly_Pred_Snaive = ifelse(Dept == 59 & Date == "2011-12-23", Weekly_Pred_Snaive * 0.4, Weekly_Pred_Snaive))
+  preds_df = mutate(preds_df, Weekly_Pred_Snaive = ifelse(Dept == 72 & Date == "2011-12-23", Weekly_Pred_Snaive * 0.85, Weekly_Pred_Snaive))
   
-  preds_df = mutate(preds_df, Weekly_Pred = ifelse(Dept == 5 & Date == "2011-12-30", Weekly_Pred * 1.35, Weekly_Pred))
-  preds_df = mutate(preds_df, Weekly_Pred = ifelse(Dept == 7 & Date == "2011-12-30", Weekly_Pred * 1.45, Weekly_Pred))
-  preds_df = mutate(preds_df, Weekly_Pred = ifelse(Dept == 82 & Date == "2011-12-30", Weekly_Pred * 1.32, Weekly_Pred))
-  preds_df = mutate(preds_df, Weekly_Pred = ifelse(Dept == 72 & Date == "2011-12-30", Weekly_Pred * 1.4, Weekly_Pred))
-  preds_df = mutate(preds_df, Weekly_Pred = ifelse(Dept == 1 & Date == "2011-12-30", Weekly_Pred * 1.3, Weekly_Pred))
-  preds_df = mutate(preds_df, Weekly_Pred = ifelse(Dept == 14 & Date == "2011-12-30", Weekly_Pred * 1.27, Weekly_Pred))
+  preds_df = mutate(preds_df, Weekly_Pred_Snaive = ifelse(Dept == 5 & Date == "2011-12-30", Weekly_Pred_Snaive * 1.35, Weekly_Pred_Snaive))
+  preds_df = mutate(preds_df, Weekly_Pred_Snaive = ifelse(Dept == 7 & Date == "2011-12-30", Weekly_Pred_Snaive * 1.45, Weekly_Pred_Snaive))
+  preds_df = mutate(preds_df, Weekly_Pred_Snaive = ifelse(Dept == 82 & Date == "2011-12-30", Weekly_Pred_Snaive * 1.32, Weekly_Pred_Snaive))
+  preds_df = mutate(preds_df, Weekly_Pred_Snaive = ifelse(Dept == 72 & Date == "2011-12-30", Weekly_Pred_Snaive * 1.4, Weekly_Pred_Snaive))
+  preds_df = mutate(preds_df, Weekly_Pred_Snaive = ifelse(Dept == 1 & Date == "2011-12-30", Weekly_Pred_Snaive * 1.3, Weekly_Pred_Snaive))
+  preds_df = mutate(preds_df, Weekly_Pred_Snaive = ifelse(Dept == 14 & Date == "2011-12-30", Weekly_Pred_Snaive * 1.27, Weekly_Pred_Snaive))
   
   return(preds_df)
 }
@@ -135,7 +224,7 @@ postprocess <- function(train, test, ...){
   pred
 }
 
-shift <- function(train, test, threshold=1.1, shift=2){
+shift <- function(train, shift_pred, threshold=1.1, shift=2){
   # This function executes a shift of the sales forecasts in the Christmas
   # period to reflect that the models are weekly, and that the day of the week
   # that Christmas occurs on shifts later into the week containing the holiday.
@@ -158,9 +247,11 @@ shift <- function(train, test, threshold=1.1, shift=2){
   #
   # returns:
   #  the test data 
-  s <- ts(rep(0,39), frequency=52, start=c(2012,44))
+  num_stores = dim(shift_pred)[2]
+  
+  s <- ts(rep(0,39), frequency=52, start=c(2011,44))
   idx <- cycle(s) %in% 48:52
-  holiday <- test[idx, 2:46]
+  holiday <- as.data.frame(shift_pred[idx, 2:num_stores])
   baseline <- mean(rowMeans(holiday[c(1, 5), ], na.rm=TRUE))
   surge <- mean(rowMeans(holiday[2:4, ], na.rm=TRUE))
   holiday[is.na(holiday)] <- 0
@@ -168,11 +259,96 @@ shift <- function(train, test, threshold=1.1, shift=2){
     shifted.sales <- ((7-shift)/7) * holiday
     shifted.sales[2:5, ] <- shifted.sales[2:5, ] + (shift/7) * holiday[1:4, ]
     shifted.sales[1, ] <- holiday[1, ]
-    test[idx, 2:46] <- shifted.sales
+    shift_pred[idx, 2:num_stores] <- shifted.sales
+  }
+  return(shift_pred)
+}
+
+# timeseries helper functions -----
+flatten_forecast <- function(f_model) {
+  f_model %>%
+    gather(Store, value, -Date, convert = TRUE)
+  #possibly switch to pivot longer
+}
+
+# Adds forecasts to the testing dataframe
+update_forecast <- function(test_month, dept_preds, dept) {
+  dept_preds <- flatten_forecast(dept_preds)
+  
+  pred.d <- test_month %>%
+    filter(Dept == dept) %>%
+    select('Store', 'Date') %>%
+    left_join(dept_preds, by = c('Store', 'Date'))
+  
+  pred.d.idx <- test_month$Dept == dept
+  pred.d <- test_month[pred.d.idx, c('Store', 'Date')] %>%
+    left_join(dept_preds, by = c('Store', 'Date'))
+  
+  # if (num_model == 1) {
+  #   test_month$Weekly_Pred1[pred.d.idx] <- pred.d$value
+  # } else if(num_model == 2) {
+  #   test_month$Weekly_Pred2[pred.d.idx] <- pred.d$value
+  # } else {
+  #   test_month$Weekly_Pred3[pred.d.idx] <- pred.d$value
+  # }
+  
+  test_month
+}
+
+# update forecasts in the global test dataframe
+update_test <- function(test_month) {
+  test <<- test %>%
+    dplyr::left_join(test_month,
+                     by = c('Date', 'Store', 'Dept', 'IsHoliday')) %>%
+    mutate(Weekly_Pred1 = coalesce(Weekly_Pred1.y, Weekly_Pred1.x)) %>%
+    mutate(Weekly_Pred2 = coalesce(Weekly_Pred2.y, Weekly_Pred2.x)) %>%
+    mutate(Weekly_Pred3 = coalesce(Weekly_Pred3.y, Weekly_Pred3.x)) %>%
+    select(-Weekly_Pred1.x, -Weekly_Pred1.y,
+           -Weekly_Pred2.x, -Weekly_Pred2.y,
+           -Weekly_Pred3.x, -Weekly_Pred3.y)
+}
+
+# Forecasts out the last observation in the training data
+naive_model<- function(train_ts, test_ts){
+  num_forecasts <- nrow(test_ts)
+  train_ts[is.na(train_ts)] <- 0
+  
+  # naive forecast per store
+  for(j in 2:ncol(train_ts)){
+    store_ts <- ts(train_ts[, j], frequency=52)
+    test_ts[, j] <- naive(store_ts, num_forecasts)$mean
+  }
+  test_ts
+}
+
+# simple TSLM model based prediction
+tslm.basic <- function(train, test){
+  # Computes a forecast using linear regression and seasonal dummy variables
+  #
+  # args:
+  # train - A matrix of Weekly_Sales values from the training set of dimension
+  #         (number of weeks in training data) x (number of stores)
+  # test - An all-zeros matrix of dimension:
+  #       (number of weeeks in training data) x (number of stores)
+  #       The forecasts are written in place of the zeros.
+  #
+  # returns:
+  #  the test(forecast) data frame with the forecasts filled in 
+  horizon <- nrow(test)
+  train[is.na(train)] <- 0
+  # first column is the date for each of the stores
+  for(j in 2:ncol(train)){
+    # grab a single store and create a 52 week time series
+    s <- ts(train[, j], frequency=52)
+    # create model based on long term trends and weekly 'seasons
+    model <- tslm(s ~ trend + season)
+    # forecast out desired number of weeks (testing data 'fold')
+    fc <- forecast(model, h=horizon)
+    #fill in each of the test weeks based on the mean forecast score
+    test[, j] <- as.numeric(fc$mean)
   }
   test
 }
-
 
 # evaluation code (dont need for actual submission) ----
 # source("mymain.R")
@@ -181,6 +357,9 @@ test = suppressMessages(read_csv('test.csv'))
 
 num_folds = 10
 wae = rep(0, num_folds)
+wae.snaive = rep(0, num_folds)
+wae.tslm = rep(0, num_folds)
+wae.avg  = rep(0, num_folds)
 
 system.time({
   for (t in 1:num_folds) {
@@ -189,17 +368,48 @@ system.time({
     fold_file = paste0('fold_', t, '.csv')
     new_train = read_csv(fold_file, col_types = cols())
     scoring_tbl = left_join(new_train, test_pred, by = c('Date', 'Store', 'Dept'))
-    
+
     actuals = scoring_tbl$Weekly_Sales
+    weights = if_else(scoring_tbl$IsHoliday, 5, 1)
+    
     preds = scoring_tbl$Weekly_Pred
     preds[is.na(preds)] = 0
-    weights = if_else(scoring_tbl$IsHoliday, 5, 1)
     wae[t] = sum(weights * abs(actuals - preds)) / sum(weights)
+    print(t)
+    print(wae[t])
   }
 })
+    # snaive scores
+#     preds = scoring_tbl$Weekly_Pred_Snaive
+#     preds[is.na(preds)] = 0
+#     wae.snaive[t] = sum(weights * abs(actuals - preds)) / sum(weights)
+# 
+#     # tslm scores
+#     preds = scoring_tbl$Weekly_Pred_TSLM
+#     preds[is.na(preds)] = 0
+#     wae.tslm[t] = sum(weights * abs(actuals - preds)) / sum(weights)
+# 
+#     #average the predictions
+#     preds = (scoring_tbl$Weekly_Pred_TSLM + scoring_tbl$Weekly_Pred_Snaive)/2
+#     preds[is.na(preds)] = 0
+#     wae.avg[t] = sum(weights * abs(actuals - preds)) / sum(weights)
+# 
+#     print(paste0('Fold #', t, " scores"))
+#     print(wae.snaive[t])
+#     print(wae.tslm[t])
+#     print(wae.avg[t])
+#   }
+# })
 
 print(wae)
 mean(wae)
+
+cbind(wae.snaive, wae.tslm, wae.avg)
+
+best = rep(0, 10)
+for(w in 1:10){
+  best[w] = min(wae.snaive[w], wae.tslm[w], wae.avg[w])
+}
 
 # setup the 'fold' files - (wont be needed for actual submission) ----
 raw_training   = readr::read_csv('train.csv')
@@ -266,7 +476,7 @@ hist(num_depts,
      main = "Number of Departments in a Store")
 
 
-# analyze how far off predictions in 5th fold are -------
+# analyze how far off predictions in 5/7th fold are -------
 scoring_tbl$off_by = scoring_tbl$Weekly_Sales - scoring_tbl$Weekly_Pred
 scoring_tbl$percent_off = scoring_tbl$off_by / scoring_tbl$Weekly_Sales
 
@@ -274,9 +484,9 @@ depts = sort(unique(scoring_tbl$Dept))
 tble = data.frame()
 
 for(dept in depts){
-  dept_mean_off = round(mean(scoring_tbl[scoring_tbl$Date == "2011-11-25" & scoring_tbl$Dept == dept, ]$percent_off), 3)
-  num_stores = nrow(scoring_tbl[scoring_tbl$Date == "2011-11-25" & scoring_tbl$Dept == dept, ])
-  volume_off = round(sum(scoring_tbl[scoring_tbl$Date == "2011-11-25" & scoring_tbl$Dept == dept, ]$off_by), 0)
+  dept_mean_off = round(mean(scoring_tbl[scoring_tbl$Date == "2012-03-01" & scoring_tbl$Dept == dept, ]$percent_off), 3)
+  num_stores = nrow(scoring_tbl[scoring_tbl$Date == "2012-03-01" & scoring_tbl$Dept == dept, ])
+  volume_off = round(sum(scoring_tbl[scoring_tbl$Date == "2012-03-01" & scoring_tbl$Dept == dept, ]$off_by), 0)
 
   details = c(as.character(dept), num_stores, dept_mean_off, volume_off)
   tble = rbind(tble, details)
