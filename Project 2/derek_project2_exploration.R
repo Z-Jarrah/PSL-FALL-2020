@@ -8,7 +8,6 @@ library(forecast)
 library(progress)
 
 # project code -------
-# not all depts need prediction
 mypredict = function() {
   if (t>1){
     train <<- train %>% add_row(new_train)
@@ -21,11 +20,7 @@ mypredict = function() {
     select(-IsHoliday)
   
   test_depts <- unique(test_current$Dept)
-  snaive_pred  = NULL
-  naive_pred = NULL
   tslm_pred  = NULL
-  
-  pb = progress_bar$new(total = length(test_depts))
   
   for (dept in test_depts) {
     pb$tick()
@@ -33,10 +28,11 @@ mypredict = function() {
     train_dept_data <- train %>% filter(Dept == dept)
     test_dept_data <- test_current %>% filter(Dept == dept)
     
-    # no need to consider stores that do not need prediction
-    # or do not have training samples
     train_stores <- unique(train_dept_data$Store)
     test_stores <- unique(test_dept_data$Store)
+    
+    # no need to consider stores that do not need prediction
+    # or do not have training samples
     test_stores <- intersect(train_stores, test_stores)
     if(length(test_stores) < 1){next}
     
@@ -64,7 +60,7 @@ mypredict = function() {
     
     # Reformat so that each column is a weekly time-series for that
     # store's department.
-    # The dataframe has a shape (num_train_dates, num_stores)
+    # The dataframe has shape (num_train_dates, num_stores)
     train_dept_ts <- train_frame %>%
         left_join(train_dept_ts, by = c('Date', 'Store')) %>%
         spread(Store, Weekly_Sales)
@@ -75,49 +71,10 @@ mypredict = function() {
         mutate(Weekly_Sales = 0) %>%
         spread(Store, Weekly_Sales)
     
-    # fully naive prediction
-    # f_naive <- naive_model(train_dept_ts, test_dept_ts)
-    # flat_f_naive = flatten_forecast(f_naive)
-    # f_naive = cbind(flat_f_naive, rep(dept, dim(flat_f_naive)[1]))
-    # colnames(f_naive) = c(colnames(f_naive)[1:2], 'Weekly_Pred', 'Dept')
-    # naive_pred <- naive_pred %>% bind_rows(f_naive)
-    # current_output <- update_forecast(test_current, f_naive, dept)
-    
-    # print(paste0("Fold ", t, "   Dept: ", dept))
-    
     #simple tslm
     tslm_output = tslm.basic(train_dept_ts, test_dept_ts)
     
-    # if(t == 5){
-    #   #seasonal naive prediction
-    #   for (store in test_stores) {
-    #     tmp_train <- train_dept_data %>%
-    #       filter(Store == store) %>%
-    #       mutate(Wk = ifelse(year(Date) == 2010, week(Date) - 1, week(Date))) %>%
-    #       mutate(Yr = year(Date))
-    #     tmp_test <- test_dept_data %>%
-    #       filter(Store == store) %>%
-    #       mutate(Wk = ifelse(year(Date) == 2010, week(Date) - 1, week(Date))) %>%
-    #       mutate(Yr = year(Date))
-    #     
-    #     tmp_train$Wk = factor(tmp_train$Wk, levels = 1:52)
-    #     tmp_test$Wk = factor(tmp_test$Wk, levels = 1:52)
-    #     
-    #     train_model_matrix <- model.matrix(~ Yr + Wk, tmp_train)
-    #     test_model_matrix <- model.matrix(~ Yr + Wk, tmp_test)
-    #     mycoef <- lm(tmp_train$Weekly_Sales ~ train_model_matrix)$coef
-    #     mycoef[is.na(mycoef)] <- 0
-    #     tmp_pred <- mycoef[1] + test_model_matrix %*% mycoef[-1]
-    #     
-    #     tmp_test <- tmp_test %>%
-    #       mutate(Weekly_Pred_Snaive = tmp_pred[, 1]) %>%
-    #       select(-Wk, -Yr)
-    #     snaive_pred <- snaive_pred %>% bind_rows(tmp_test)
-    #   }
-    #   
-    #   
-    # }
-    
+    #dont try to shift output for depts in only 1 store.  gets wacky
     if(dim(tslm_output)[2] > 2){
       tslm_output = shift(train, tslm_output, shift = 1)}
     
@@ -126,17 +83,7 @@ mypredict = function() {
     colnames(tslm_simple) = c(colnames(tslm_simple)[1:2], 'Weekly_Pred', 'Dept')
     tslm_pred <- tslm_pred %>% bind_rows(tslm_simple)
   }
-  
-  # if(t == 5){
-  #   print(length(tslm_pred$Weekly_Pred))
-  #   print(length(snaive_pred$Weekly_Pred_Snaive))
-  #   new_pred = (tslm_pred$Weekly_Pred + snaive_pred$Weekly_Pred_Snaive) / 2
-  #   tslm_pred$Weekly_Pred = new_pred 
-  #   }
-  
-  # create a combined object for exploration
-  # combined_output = left_join(tslm_pred, snaive_pred, by = c("Date", "Store", "Dept"))
-  
+
   return(tslm_pred)
 }
 
@@ -229,10 +176,8 @@ shift <- function(train, shift_pred, threshold=1.1, shift=2){
   # period to reflect that the models are weekly, and that the day of the week
   # that Christmas occurs on shifts later into the week containing the holiday.
   #
-  # NB: Train is actually not used here. Previously, there were other post-
-  #     adjustments which did use it, and it is taken in here to preserve a 
-  #     calling signature.
-  #
+  # NB: Train is actually not used here. 
+  
   # args:
   # train - this is an n_weeks x n_stores matrix of values of Weekly_Sales
   #         for the training set within department, across all the stores
@@ -244,9 +189,7 @@ shift <- function(train, shift_pred, threshold=1.1, shift=2){
   # shift - The number of days to shift sales around Christmas.
   #         Should be 2 if the model is based on the last year only,
   #         or 2.5 if it uses both years
-  #
-  # returns:
-  #  the test data 
+
   num_stores = dim(shift_pred)[2]
   
   s <- ts(rep(0,39), frequency=52, start=c(2011,44))
@@ -261,6 +204,7 @@ shift <- function(train, shift_pred, threshold=1.1, shift=2){
     shifted.sales[1, ] <- holiday[1, ]
     shift_pred[idx, 2:num_stores] <- shifted.sales
   }
+  
   return(shift_pred)
 }
 
@@ -379,32 +323,9 @@ system.time({
     print(wae[t])
   }
 })
-    # snaive scores
-#     preds = scoring_tbl$Weekly_Pred_Snaive
-#     preds[is.na(preds)] = 0
-#     wae.snaive[t] = sum(weights * abs(actuals - preds)) / sum(weights)
-# 
-#     # tslm scores
-#     preds = scoring_tbl$Weekly_Pred_TSLM
-#     preds[is.na(preds)] = 0
-#     wae.tslm[t] = sum(weights * abs(actuals - preds)) / sum(weights)
-# 
-#     #average the predictions
-#     preds = (scoring_tbl$Weekly_Pred_TSLM + scoring_tbl$Weekly_Pred_Snaive)/2
-#     preds[is.na(preds)] = 0
-#     wae.avg[t] = sum(weights * abs(actuals - preds)) / sum(weights)
-# 
-#     print(paste0('Fold #', t, " scores"))
-#     print(wae.snaive[t])
-#     print(wae.tslm[t])
-#     print(wae.avg[t])
-#   }
-# })
 
 print(wae)
 mean(wae)
-
-cbind(wae.snaive, wae.tslm, wae.avg)
 
 best = rep(0, 10)
 for(w in 1:10){
