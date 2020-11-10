@@ -37,11 +37,6 @@ system.time({
 print(wae)
 mean(wae)
 
-best = rep(0, 10)
-for(w in 1:10){
-  best[w] = min(wae.snaive[w], wae.tslm[w], wae.avg[w])
-}
-
 # setup the 'fold' files - (wont be needed for actual submission) ----
 raw_training   = readr::read_csv('train.csv')
 dates = raw_training$Date

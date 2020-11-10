@@ -1,4 +1,4 @@
-##Project 1 - mymain.R
+##Project 2 - CS598 PSL - mymain.R
 #Derek Chapman (derek4)
 #Zeed Jarah (zjarrah2)
 
