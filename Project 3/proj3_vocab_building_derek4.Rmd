@@ -1,0 +1,96 @@
+---
+title: "Project 3 Vocab Building"
+output:
+  html_document:
+    df_print: paged
+  html_notebook:
+    highlight: pygments
+    theme: yeti
+---
+
+```{r setup, message = FALSE}
+library(glmnet)
+library(tm)
+library(text2vec)
+
+set_cache = T
+```
+
+First we calculate the length of each review.  This is a computationally intensive step since we look at all words and do not use a 'stop word' list of any kind.
+```{r create_dtm, cache=set_cache}
+set.seed(0721)
+data = read.table("alldata.tsv", stringsAsFactors = FALSE,
+                   header = TRUE)
+reviews_words = itoken(data$review,
+               preprocessor = tolower, 
+               tokenizer = word_tokenizer)
+full_vocab = create_vocabulary(reviews_words)
+dtm_full_vocab  = create_dtm(reviews_words, vocab_vectorizer(full_vocab))
+
+review_length = rowSums(dtm_full_vocab)
+```
+
+We can see that there is a wide range of review lengths.  
+```{r}
+range(review_length)
+```
+
+Upon further inspection the longer reviews are definitely outliers and create a distribution with a very long, thin tail.  If we ignore any review that is greater than 700 words we get a much nicer distribution that looks like a mix of a normal and a f-distribution.
+```{r review_viz, cache = set_cache, fig.height=6, fig.align="center"}
+par(mfrow = c(2,1))
+
+hist(review_length)
+hist(review_length[review_length < 700])
+```
+
+We choose 700 words since it covers about 2 standard deviations worth of the data and cuts off only the outlier lengthed reviews.  But the reviews that are cut off are the most wordy and tended to skew our results and make our final vocab list much less interpretable and coherent.
+```{r coverage}
+sum(review_length > 700) / length(review_length)
+round(sum(review_length[review_length > 700]) / sum(review_length), 3)
+```
+
+We see that while long reviews make up about 3% of the reviews they take up over a tenth of the entire amount of words for all reviews.
+
+Next we grab all the idices of reviews that are less than 700 words and subset our data.
+```{r train_short, cache=set_cache}
+short_idx = which(review_length < 700)
+
+train_short = data[short_idx, ]
+train_short$review = gsub('<.*?>', ' ', train_short$review)
+```
+
+We re-run the tokenizer and create a new document-term matrix on only the short words.  Unlike our initial word counting process we include stop words removal, allow for ngrams up to four, and prune our vocabulary using default parameters that try to find a balance between being too permissive and being too restrictive.
+```{r select_vocab_dtm, cache = set_cache}
+stop_words = c("i", "me", "my", "myself", 
+               "we", "our", "ours", "ourselves", 
+               "you", "your", "yours", 
+               "their", "they", "his", "her", 
+               "she", "he", "a", "an", "and",
+               "is", "was", "are", "were", 
+               "him", "himself", "has", "have", 
+               "it", "its", "the", "us")
+word_select = itoken(train_short$review,
+                        preprocessor = tolower, 
+                        tokenizer = word_tokenizer)
+short_vocab = create_vocabulary(word_select,
+                              stopwords = stop_words,
+                              ngram = c(1L,4L))
+short_vocab = prune_vocabulary(short_vocab, term_count_min = 10,
+                              doc_proportion_max = 0.5,
+                              doc_proportion_min = 0.001)
+
+dtm_word_short = create_dtm(word_select, vocab_vectorizer(short_vocab))
+```
+
+We then use lasso to do parameter selection, or in this case word selection, and then take a look at the lambda value that shrunk our word list down to less than 1000 words
+```{r select_model}
+short_mdl = glmnet(x = dtm_word_short, y = train_short$sentiment, 
+                  alpha = 1,
+                  family='binomial')
+
+max(which(short_mdl$df < 1000))
+myvocab = colnames(dtm_word_short)[which(short_mdl$beta[, 36] != 0)]
+
+length(myvocab)
+myvocab
+```
