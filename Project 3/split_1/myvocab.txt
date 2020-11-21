@@ -1,4 +1,3 @@
-"x"
 "give_4"
 "low_rating"
 "blew_away"
