@@ -44,12 +44,21 @@ it_test = itoken(test$review,
 dtm_test = create_dtm(it_test, ngram_vectorizer)
 
 # Train classification model
+class_mdl_cv = cv.glmnet(
+  x = dtm_train,
+  y = train$sentiment,
+  alpha = 1,
+  family = 'binomial'
+ )
+
 class_mdl = glmnet(
   x = dtm_train,
   y = train$sentiment,
   alpha = 0,
+  lambda = class_mdl_cv$lambda.1se,
   family = 'binomial'
-  )
+ )
+
 
 # Compute and save predictions
 mypred = predict(class_mdl, dtm_test, type = "response")

@@ -1,4 +1,5 @@
 library(pROC)
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 source("mymain.R")
 
