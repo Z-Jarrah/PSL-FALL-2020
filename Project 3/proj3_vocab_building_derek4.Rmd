@@ -58,7 +58,7 @@ round(sum(review_length[review_length > 700]) / sum(review_length), 3)
 ```
 
 We see that while long reviews make up about 3% of the total number of reviews they take up over a tenth of the entire amount of words for all reviews.  
-Next we grab all the idices of reviews that are less than 700 words and subset our data.
+Next we grab all the indices of reviews that are less than 700 words and subset our data.
 
 ```{r train_short, cache=set_cache}
 short_idx = which(review_length < 700)
@@ -91,15 +91,75 @@ short_vocab = prune_vocabulary(short_vocab, term_count_min = 10,
 dtm_word_short = create_dtm(word_select, vocab_vectorizer(short_vocab))
 ```
 
-We then use The Lasso to do parameter selection, or in this case word selection.  Next we use the lambda value that shrunk our word list down to less than 1000 words to select the final word list from our model.
-```{r select_model}
+We then use The Lasso to do parameter selection, or in this case word selection.  Next we use the lambda value that shrunk our word list down to less than 1000 words. to select the final word list from our model.
+```{r select_model, eval = F}
 short_mdl = glmnet(x = dtm_word_short, y = train_short$sentiment, 
                   alpha = 1,
                   family='binomial')
 
 benchmark_lamda = max(which(short_mdl$df < 1000))
 myvocab = colnames(dtm_word_short)[which(short_mdl$beta[, benchmark_lamda] != 0)]
+```
 
+After this we hand tune the list somewhat.  Although this list was chosen using lambda and cross-validation during the initial exploration we end up with some words that its useful to remove.  Such as:
+
+* Most of the digits like 1, 3, 7.5 since they are either non-specific or covered by other versions like 3_out_of_10
+* Most of the ngrams in the format of "2_out_of_10" since this is covered by "2_out_of".  Its a safe assumption that the next work will be "10" in such a phrase.
+* Some of the description style words/phrases such as "based_on_true_story".  This tells us very little about whether the person did/did not like the movie.
+* There are also many words that are longer stems of other just as descriptive phrases.  Such as "much_better_than".  This is an area where a more crafted stop words list may have been useful in selecting words but it also may be more effort
+* Some words ended up with ridiculously small beta values due to the fact that they are not descriminitive words such as "lives".
+* There were also many words that were selected out by a further round of The Lasso since they could be setups for either positive or negative comments such as "lot_of_things".
+
+We also retain some words that The Lasso zeroed out such as "lot_of_fun".  Intuitively this should be an indication of a very positive review.  Its possible that in this particular split of the data that it is not so helpful.  We keep it in the vocab list in the hope that it helps in some of the splits.
+
+Finally we throw a much wider net and manually review words that are very selective model may have missed.  We use the 1-standard-error lambda value since this will still give us a top value but is significaintly more restrictive in terms of word count than the minimum lambda.  The difference was a reduction in word count of around 99%!  This still puts us far over the benchmark we are aiming for since it includes about 2800 words.  However we take a look at the top 10% of words from this list and see which ones are not already in our current vocab list.  We add 9 new words to our vocab list based on intuition that they will help (and the fact that we have room to play with in terms of vocab size).
+
+* Keep some words that we know are strong indicators of negative reviews such as: "hated" and "clichés"
+* Keep some words that are probably indicators of positive reviews such as: "genuine" and "witty"
+
+```{r wide-net, cache = set_cache, eval = F}
+large_net <- read.table("alldata.tsv", stringsAsFactors = FALSE,
+                   header = TRUE)
+
+it_word_large = itoken(large_net$review,
+                  preprocessor = tolower, 
+                  tokenizer = word_tokenizer)
+
+large_vocab = create_vocabulary(it_word_large,
+                              stopwords = stop_words,
+                              ngram = c(1L,4L))
+large_vocab = prune_vocabulary(large_vocab, term_count_min = 10,
+                             doc_proportion_max = 0.5,
+                             doc_proportion_min = 0.01)
+dtm_word_select  = create_dtm(it_word_large, vocab_vectorizer(large_vocab))
+
+#select words
+tmpfit_cv = cv.glmnet(x = dtm_word_select, 
+                      y = large_net$sentiment, 
+                      alpha = 1,
+                      family='binomial')
+
+selected_fit = glmnet(x = dtm_word_select, 
+                      y = large_net$sentiment, 
+                      alpha = 0,
+                      lambda = tmpfit_cv$lambda.1se,
+                      family='binomial')
+
+selected_words = colnames(dtm_word_select)[which(abs(selected_fit$beta) > .5)]
+current_vocab = scan(file = "split_2/myvocab.txt", what = character())
+for(word in selected_words){
+  if(!(word %in% current_vocab)){
+    print(paste(word, word %in% current_vocab))
+  }
+}
+```
+
+
+Ultimately the hand-tuning of the vocab list was beneficial.  It seems to have allowed more 'probability mass' to go to words with desciminitavie power rather than getting chipped away in small amounts by less helpful words.
+
+Our final, programmaticly and hand-tuned, list is:
+```{r final-list}
+myvocab = scan(file = "myvocab.txt", what = character())
 length(myvocab)
 myvocab
 ```
