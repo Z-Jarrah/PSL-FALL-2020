@@ -43,10 +43,14 @@ Upon further inspection the longest reviews are definitely outliers and create a
 par(mfrow = c(2,1))
 
 hist(review_length,
-     xlab = "# of Words",
+     xlab = "Length of Review (Word Count)",
+     ylab = "",
+     yaxt = "none",
      main = "Histogram of All Reviews")
 hist(review_length[review_length < 700],
-     xlab = "# of Words",
+     xlab = "Length of Review (Word Count)",
+     ylab = "",
+     yaxt = "none",
      main = "Histogram of only Reviews < 700 words")
 ```
 
