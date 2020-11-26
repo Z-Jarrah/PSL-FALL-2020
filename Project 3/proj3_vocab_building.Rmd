@@ -14,7 +14,7 @@ library(glmnet)
 library(tm)
 library(text2vec)
 
-set_cache = T
+set_cache = F
 ```
 
 First we calculate the length of each review.  We do not use a stop word list of any kind and include all 120,000 unique words (and some of them certainly are unique!)
@@ -62,6 +62,7 @@ round(sum(review_length[review_length > 700]) / sum(review_length), 3)
 ```
 
 We see that while long reviews make up about 3% of the total number of reviews they take up over a tenth of the entire amount of words for all reviews.  
+
 Next we grab all the indices of reviews that are less than 700 words and subset our data.
 
 ```{r train_short, cache=set_cache}
@@ -71,7 +72,7 @@ train_short = data[short_idx, ]
 train_short$review = gsub('<.*?>', ' ', train_short$review)
 ```
 
-We re-run the tokenizer and create a new document-term matrix based on only the 'short' reviews.   Unlike our initial word counting process we include stop words removal, allow for ngrams up to four, and prune our vocabulary using default parameters that try to find a balance between being too permissive and being too restrictive.
+We re-run the tokenizer and create a new document-term matrix based on only the 'short' reviews.   Unlike our initial word counting process we include stop-word removal, allow for ngrams up to four, and prune our vocabulary using parameters that try to find a balance between being too permissive and being too restrictive.
 
 ```{r select_vocab_dtm, cache = set_cache}
 stop_words = c("i", "me", "my", "myself", 
@@ -95,7 +96,7 @@ short_vocab = prune_vocabulary(short_vocab, term_count_min = 10,
 dtm_word_short = create_dtm(word_select, vocab_vectorizer(short_vocab))
 ```
 
-We then use The Lasso to do parameter selection, or in this case word selection.  Next we use the lambda value that shrunk our word list down to less than 1000 words. to select the final word list from our model.
+We then use The Lasso to do parameter selection, or in this case word selection.  Next we select our word list from our model useing the lambda value that shrinks the list down to less than 1,000 words.
 ```{r select_model, eval = F}
 short_mdl = glmnet(x = dtm_word_short, y = train_short$sentiment, 
                   alpha = 1,
@@ -110,13 +111,13 @@ After this we hand tune the list somewhat.  Although this list was chosen using 
 * Most of the digits like 1, 3, 7.5 since they are either non-specific or covered by other versions like 3_out_of_10
 * Most of the ngrams in the format of "2_out_of_10" since this is covered by "2_out_of".  Its a safe assumption that the next work will be "10" in such a phrase.
 * Some of the description style words/phrases such as "based_on_true_story".  This tells us very little about whether the person did/did not like the movie.
-* There are also many words that are longer stems of other just as descriptive phrases.  Such as "much_better_than".  This is an area where a more crafted stop words list may have been useful in selecting words but it also may be more effort
-* Some words ended up with ridiculously small beta values due to the fact that they are not descriminitive words such as "lives".
+* There are also many words that are longer stems of other just as descriptive phrases.  Such as "much_better_than" and "much_better".
+* Some words ended up with ridiculously small beta values due to the fact that they are not descriminitive such as "lives".  These are removed to free up space to add back in other better words and to free up 'probability mass' to go to more descriptive words/phrases.
 * There were also many words that were selected out by a further round of The Lasso since they could be setups for either positive or negative comments such as "lot_of_things".
 
 We also retain some words that The Lasso zeroed out such as "lot_of_fun".  Intuitively this should be an indication of a very positive review.  Its possible that in this particular split of the data that it is not so helpful.  We keep it in the vocab list in the hope that it helps in some of the splits.
 
-Finally we throw a much wider net and manually review words that are very selective model may have missed.  We use the 1-standard-error lambda value since this will still give us a top value but is significaintly more restrictive in terms of word count than the minimum lambda.  The difference was a reduction in word count of around 99%!  This still puts us far over the benchmark we are aiming for since it includes about 2800 words.  However we take a look at the top 10% of words from this list and see which ones are not already in our current vocab list.  We add 9 new words to our vocab list based on intuition that they will help (and the fact that we have room to play with in terms of vocab size).
+Finally we throw a much wider net and manually review words that our very selective model may have missed.  We use the 1-standard-error lambda value since this will still give us the top words but is a significaintly more restricted feature space in terms of word count than the minimum lambda.  The difference was a reduction in word count of around 99%!  However, his still puts us far over the benchmark we are aiming for since it includes about 2,800 words.  We take a look at the top 10% of words from this list and see which ones are not already in our current vocab list.  We add 9 new words to our vocab list based on intuition that they will help (and the fact that we have room to play with in terms of vocab size).
 
 * Keep some words that we know are strong indicators of negative reviews such as: "hated" and "clichés"
 * Keep some words that are probably indicators of positive reviews such as: "genuine" and "witty"
