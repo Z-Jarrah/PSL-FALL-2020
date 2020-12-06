@@ -31,31 +31,34 @@ movies$Year = as.numeric(unlist(
 #system 1derek - genre recommendation ----
 
 ##create margin and raw_margin rating ----
-n_movies = nrow(movies)
-movies$margin_rating = NA
-movies$raw_margin = NA
-
-for(i in 1:n_movies){
-  if(i %% 10 == 0){print(paste0(i, " out of ", n_movies))}
+create_margin_ratings = function() {
+  n_movies = nrow(movies)
+  movies$margin_rating = NA
+  movies$raw_margin = NA
   
-  #snag each movie by their ID#
-  id = movies$MovieID[i]
+  for (i in 1:n_movies) {
+    if (i %% 10 == 0) {
+      print(paste0(i, " out of ", n_movies))
+    }
+    
+    #snag each movie by their ID#
+    id = movies$MovieID[i]
+    
+    #get all ratings matching that ID#
+    ratings_for_movie = ratings[ratings$MovieID == id, "Rating"]
+    ratings_for_movie = ratings_for_movie - 3 # center onto 0
+    
+    #get raw margin for exploration
+    movies[i, "raw_margin"] = sum(ratings_for_movie)
+    
+    # calculate and store margin (sum + abs)
+    movies[i, "margin_rating"] = abs(sum(ratings_for_movie))
+  }
   
-  #get all ratings matching that ID#
-  ratings_for_movie = ratings[ratings$MovieID == id, "Rating"]
-  
-  # center onto 0
-  ratings_for_movie = ratings_for_movie - 3
-  
-  #get raw margin for exploration
-  movies[i, "raw_margin"] = sum(ratings_for_movie)
-  
-  # calculate and store margin (sum + abs)
-  movies[i, "margin_rating"] = abs(sum(ratings_for_movie))
 }
 
 
-##create genre recommendations list/file ----
+##write genre recommendations to file ----
 write_recommendations = function() {
   genre_list = c("Action", "Adventure", "Animation",
     "Children's", "Comedy", "Crime", "Documentary",
