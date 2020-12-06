@@ -1,6 +1,7 @@
 #'system 1' genre based recommendations
 library(recommenderlab)
 library(Matrix)
+library(dplyr)
 
 # get the data ----
 myurl = "https://liangfgithub.github.io/MovieData/"
@@ -53,6 +54,56 @@ for(i in 1:n_movies){
   movies[i, "margin_rating"] = abs(sum(ratings_for_movie))
 }
 
+
+##create genre recommendations list/file ----
+write_recommendations = function() {
+  genre_list = c("Action", "Adventure", "Animation",
+    "Children's", "Comedy", "Crime", "Documentary",
+    "Drama", "Fantasy", "Film-Noir", "Horror",
+    "Musical", "Mystery", "Romance", "Sci-Fi",
+    "Thriller", "War", "Western")
+  
+  #turn movies/genres into a boolean matrix of movies x genres
+  genres = as.data.frame(movies$Genres, stringsAsFactors = FALSE)
+  tmp = as.data.frame(tstrsplit(genres[, 1], '[|]',
+                                type.convert = TRUE),
+                      stringsAsFactors = FALSE)
+  genre_matrix = matrix(0, nrow(movies), length(genre_list))
+  for (i in 1:nrow(tmp)) {
+    genre_matrix[i, genre_list %in% tmp[i, ]] = 1
+  }
+  colnames(genre_matrix) = genre_list
+  remove("tmp", "genres")
+  
+  #create a matrix 50 movies x genre
+  genre_recs_mat = matrix("-", 50, length(genre_list))
+  colnames(genre_recs_mat) = genre_list
+  
+  #for each genre
+  for (g in genre_list) {
+    #grab all movies that are tagged with that genre
+    m = which(genre_matrix[, g] == 1)
+    movs = movies[m, c("Title", "margin_rating")]
+    
+    #sort by margin rating
+    movs = arrange(movs, desc(margin_rating))
+    genre_recs_mat[, g] = movs$Title[1:50]
+  }
+  
+  #save recommendations for later
+  write.csv(genre_recs_mat,
+            file = "genre_recommendations.csv",
+            row.names = F)
+  
+  #just to test
+  # readitbacktome = as.data.frame(read.csv('genre_recommendations.csv', header = T))
+}
+
+
+##function to actually return genre recommendations ----
+system1derek = function(sel_genre, n = 10){
+  
+}
 
 #splitting genres
 #most number of genres assigned to a movie?
