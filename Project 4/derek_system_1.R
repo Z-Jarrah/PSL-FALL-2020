@@ -2,8 +2,10 @@
 library(recommenderlab)
 library(Matrix)
 library(dplyr)
+library(plyr)
 
 # get the data ----
+##ratings
 myurl = "https://liangfgithub.github.io/MovieData/"
 ratings = read.csv(paste0(myurl, 'ratings.dat?raw=true'), 
                    sep = ':',
@@ -12,6 +14,7 @@ ratings = read.csv(paste0(myurl, 'ratings.dat?raw=true'),
 colnames(ratings) = c('UserID', 'MovieID', 'Rating', 'Timestamp')
 ratings = ratings[, -4]   #dont need timestamp
 
+##movies
 movies = readLines(paste0(myurl, 'movies.dat?raw=true'))
 movies = strsplit(movies, split = "::", fixed = TRUE, useBytes = TRUE)  #seperated by ::
 movies = matrix(unlist(movies), ncol = 3, byrow = TRUE)  #is a list of lists
@@ -28,8 +31,10 @@ movies$Title[73]
 movies$Year = as.numeric(unlist(
   lapply(movies$Title, function(x) substr(x, nchar(x)-4, nchar(x)-1))))  
 
-#system 1derek - genre recommendation ----
+##load genre recommendations
+genre_recs = as.data.frame(read.csv('genre_recommendations.csv', header = T))
 
+#system 1derek - genre recommendation ----
 ##create margin and raw_margin rating ----
 create_margin_ratings = function() {
   n_movies = nrow(movies)
@@ -54,9 +59,7 @@ create_margin_ratings = function() {
     # calculate and store margin (sum + abs)
     movies[i, "margin_rating"] = abs(sum(ratings_for_movie))
   }
-  
 }
-
 
 ##write genre recommendations to file ----
 write_recommendations = function() {
@@ -105,7 +108,7 @@ write_recommendations = function() {
 
 ##function to actually return genre recommendations ----
 system1derek = function(sel_genre, n = 10){
-  
+  return(genre_recs[1:n, sel_genre])
 }
 
 #splitting genres
@@ -123,36 +126,92 @@ for(i in 1:length(unique_combo_genres)){
 
 
 # system 2a ----
-#split training test data for system 2
 set.seed(0721)
+
+#split training test data for system 2
 train_idx = sample(nrow(ratings), floor(nrow(ratings)) * 0.8)
 train = ratings[train_idx, ]
 test = ratings[-train_idx, ]
 head(train)
 head(test)
 
-#create a sparse matrix with data x at location i,j
-i = paste0('u', train$UserID) #user number ...
-j = paste0('m', train$MovieID) #movie number ...
-x = train$Rating
-#nessecary to prevent sparseMatrix freaking out over i + j being characters instead of integers
-tmp = data.frame(i, j, x, stringsAsFactors = T)
-Rmat = sparseMatrix(as.integer(tmp$i), as.integer(tmp$j), x = tmp$x)
-#the levels for each are the order in which the data is already entered into the matrix
-rownames(Rmat) = levels(tmp$i)
-colnames(Rmat) = levels(tmp$j)
+##helper functions----
+split_by_user = function(ratings, s = 0.8){
+  unique_users = unique(ratings$UserID)
+  train_users = sample(unique_users, length(unique_users) * s)
+  
+  train_ratings = ratings[ratings$UserID %in% train_users, ]
+  test_ratings = ratings[!(ratings$UserID %in% train_users), ]
+  return(list(train = train_ratings, test = test_ratings))
+}
 
-#realRatingMatrix is an actual datatype.  For whatever reason Recommender() requires a specific type of object
-Rmat = new('realRatingMatrix', data = Rmat)
+create_rating_matrix = function(ratings_df){
+  #create a sparse matrix with data x at location i,j
+  i = paste0('u', ratings_df$UserID) #user number ...
+  j = paste0('m', ratings_df$MovieID) #movie number ...
+  x = ratings_df$Rating
+  
+  #nessecary to prevent sparseMatrix freaking out over i + j being characters instead of integers
+  tmp = data.frame(i, j, x, stringsAsFactors = T)
+  Rmat = sparseMatrix(as.integer(tmp$i), as.integer(tmp$j), x = tmp$x)
+  #the levels for each are the order in which the data is already entered into the matrix
+  rownames(Rmat) = levels(tmp$i)
+  colnames(Rmat) = levels(tmp$j)
+  
+  #realRatingMatrix is an actual datatype.  For whatever reason Recommender() requires a specific type of object
+  Rmat = new('realRatingMatrix', data = Rmat)
+}
 
-#creates a S4 recommender object that is a bit black-box ish
-rec_UBCF = Recommender(Rmat, method = 'UBCF',
-                       parameter = list(normalize = 'Z-score', 
-                                        method = 'Cosine', 
-                                        nn = 25))
-rec_UBCF@model
+#complete cycle for system 2
+#for reduced testing run !!!!!!!!dont use in real run
+sample_UserIDs = sample(ratings$UserID, size = 1000)
+ratings = ratings[ratings$UserID %in% sample_UserIDs, ]
 
-#creates a different object that is also of type realRatingMatrix so you cant look at it directly and most convert it
-recom = predict(rec_UBCF, 
-                Rmat[1:3], type = 'ratings')
-as(recom, 'matrix')[, 1:10]
+num_iterations = 3
+rmse = integer(num_iterations)
+
+for(i in 1:num_iterations){
+  print(paste0("On iteration #", i))
+
+  #hold back some ratings for evaluation
+  eval_idx = sample(ratings$UserID, floor(nrow(ratings) * 0.05))
+  eval_ratings = ratings[eval_idx, ]
+  use_ratings  = ratings[-eval_idx, ]
+
+  full_Rmat  = create_rating_matrix(use_ratings)
+  
+  train_idx  = sample(nrow(full_Rmat), floor(nrow(full_Rmat) * 0.8))
+  train_Rmat = full_Rmat[train_idx, ]
+  test_Rmat  = full_Rmat[-train_idx, ]
+  
+  #creates a S4 recommender object that is a bit black-box ish
+  rec_UBCF = Recommender(train_Rmat, method = 'UBCF',
+                         parameter = list(normalize = 'Z-score', 
+                                          method = 'Cosine', 
+                                          nn = 25))
+  
+  #this part takes choke long
+  print('making predictions')
+  system.time({recom = predict(rec_UBCF, 
+                               test_Rmat, type = 'ratings')})
+  rec_list = as(recom, 'list')  # each element are ratings of that user
+  
+  test_pred = eval_ratings
+  test_pred$pred_rating = NA
+  
+  # For all lines in test file, one by one
+  print('filling in missing predictions')
+  for (u in 1:nrow(eval_ratings)){
+    
+    # Read userid and movieid from columns 2 and 3 of test data
+    userid = paste0("u", as.character(eval_ratings$UserID[u]))
+    movieid = paste0("m", as.character(eval_ratings$MovieID[u]))
+    
+    rating_ij = rec_list[[userid]][movieid]
+    # handle missing values; 2.5 might not be the ideal choice
+    test_pred$pred_rating[u] = ifelse(is.numeric(rating_ij), rating_ij, 2.5)
+  }
+  
+  #calculate RMSE
+  rmse[i] = RMSE(test_pred$Rating, test_pred$pred_rating, na.rm = T)
+}
