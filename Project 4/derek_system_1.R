@@ -3,6 +3,7 @@ library(recommenderlab)
 library(Matrix)
 library(dplyr)
 library(plyr)
+library(data.table)
 
 # get the data ----
 ##ratings
@@ -35,6 +36,9 @@ movies$Year = as.numeric(unlist(
 genre_recs = as.data.frame(read.csv('genre_recommendations.csv', header = T))
 
 #system 1derek - genre recommendation ----
+create_margin_ratings()
+write_recommendations()
+
 ##create margin and raw_margin rating ----
 create_margin_ratings = function() {
   n_movies = nrow(movies)
@@ -42,7 +46,7 @@ create_margin_ratings = function() {
   movies$raw_margin = NA
   
   for (i in 1:n_movies) {
-    if (i %% 10 == 0) {
+    if (i %% 500 == 0) {
       print(paste0(i, " out of ", n_movies))
     }
     
