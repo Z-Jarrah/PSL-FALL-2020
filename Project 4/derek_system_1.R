@@ -166,56 +166,64 @@ create_rating_matrix = function(ratings_df){
   Rmat = new('realRatingMatrix', data = Rmat)
 }
 
-#complete cycle for system 2
 #for reduced testing run !!!!!!!!dont use in real run
 sample_UserIDs = sample(ratings$UserID, size = 1000)
-ratings = ratings[ratings$UserID %in% sample_UserIDs, ]
+smol_ratings = ratings[ratings$UserID %in% sample_UserIDs, ]
 
-num_iterations = 3
+
+#complete cycle for system 2 ----
+num_iterations = 10
 rmse = integer(num_iterations)
 
 for(i in 1:num_iterations){
   print(paste0("On iteration #", i))
-
-  #hold back some ratings for evaluation
-  eval_idx = sample(ratings$UserID, floor(nrow(ratings) * 0.05))
-  eval_ratings = ratings[eval_idx, ]
-  use_ratings  = ratings[-eval_idx, ]
-
-  full_Rmat  = create_rating_matrix(use_ratings)
   
-  train_idx  = sample(nrow(full_Rmat), floor(nrow(full_Rmat) * 0.8))
-  train_Rmat = full_Rmat[train_idx, ]
-  test_Rmat  = full_Rmat[-train_idx, ]
-  
-  #creates a S4 recommender object that is a bit black-box ish
-  rec_UBCF = Recommender(train_Rmat, method = 'UBCF',
-                         parameter = list(normalize = 'Z-score', 
-                                          method = 'Cosine', 
-                                          nn = 25))
-  
-  #this part takes choke long
-  print('making predictions')
-  system.time({recom = predict(rec_UBCF, 
-                               test_Rmat, type = 'ratings')})
-  rec_list = as(recom, 'list')  # each element are ratings of that user
-  
-  test_pred = eval_ratings
-  test_pred$pred_rating = NA
-  
-  # For all lines in test file, one by one
-  print('filling in missing predictions')
-  for (u in 1:nrow(eval_ratings)){
-    
-    # Read userid and movieid from columns 2 and 3 of test data
-    userid = paste0("u", as.character(eval_ratings$UserID[u]))
-    movieid = paste0("m", as.character(eval_ratings$MovieID[u]))
-    
-    rating_ij = rec_list[[userid]][movieid]
-    # handle missing values; 2.5 might not be the ideal choice
-    test_pred$pred_rating[u] = ifelse(is.numeric(rating_ij), rating_ij, 2.5)
-  }
+  Rmat  = create_rating_matrix(smol_ratings)
+  r_eval_scheme = evaluationScheme(Rmat, 
+                                   method = 'split', train = 0.8, 
+                                   given = 10, goodRating = 5)
+  rec_UBCF = Recommender(getData(r_eval_scheme, 'train'), 
+                         method = 'SVD',
+                         parameter = list(normalize = 'center', 
+                                          k = 25))
+  preds = predict(rec_UBCF, getData(r_eval_scheme, 'known'), type = 'ratings')
   
   #calculate RMSE
-  rmse[i] = RMSE(test_pred$Rating, test_pred$pred_rating, na.rm = T)
+  error = calcPredictionAccuracy(preds, getData(r_eval_scheme, 'unknown'))
+  rmse[i] = error[[1]]
 }
+
+rmse
+print(paste0("Average RMSE: ", mean(rmse)))
+
+##use Recommender labs built in functions for creating/predicting/evaluating ----
+Rmat = create_rating_matrix(ratings)
+
+normal_Rmat = normalize(Rmat)
+getRatingMatrix(Rmat)[1:10, 1:10]
+getRatingMatrix(normal_Rmat)[1:10, 1:10]
+image(normal_Rmat[1:10, 1:20]) #produces a heatmap style plot
+hist(getRatings(Rmat))
+hist(getRatings(normal_Rmat))
+
+r_eval_scheme = evaluationScheme(Rmat, 
+                                 method = 'split', train = 0.8, 
+                                 given = 10, goodRating = 5)
+algos = list(
+  "Random"  = list(name = "RANDOM", param = NULL),
+  'Popular' = list(name = 'POPULAR', param = NULL),
+  'UBCF'    = list(name = 'UBCF', param = list(nn = 25)),
+  'IBCF'    = list(name = 'IBCF', param = list(k = 25)),
+  'SVD'     = list(name = 'SVD', param = list(k = 25))
+  # 'SVD50'     = list(name = 'SVD', param = list(k = 50))
+)
+
+results = evaluate(r_eval_scheme, algos, type = 'ratings')
+
+clrs = c('gray30', 'dodgerblue', 'orange', 'magenta4', 'tomato')
+plot(results, 'prec/rec', 
+     main = ,
+     col = clrs)
+title(main = "Scores using Full Dataset, 5-Fold CV, Given-10")
+#using type = "topNList" gives wacky TPR/FPR evaluation since its only looking at a True Positive Rate involving N possible condididates (for example top 5)
+# it will return a bananas amoutn of True Negatives since everything that isnt in the top N will not get returned
