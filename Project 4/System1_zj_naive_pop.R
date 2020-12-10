@@ -88,7 +88,7 @@ write_recommendations = function() {
   for (g in genre_list) {
     #grab all movies that are tagged with that genre
     m = which(genre_matrix[, g] == 1)
-    movs = movies[m, c("Title", "margin")]
+    movs = movies[m, c("Title", "margin_rating")]
     
     #sort by margin rating
     movs = arrange(movs, desc(margin_rating))
@@ -97,16 +97,14 @@ write_recommendations = function() {
   
   #save recommendations for later
   write.csv(genre_recs_mat,
-            file = "genre_recommendations.csv",
+            file = "zj_genre_recommendations.csv",
             row.names = F)
   
-  #just to test
-  # readitbacktome = as.data.frame(read.csv('genre_recommendations.csv', header = T))
 }
 
 
 ##function to actually return genre recommendations ----
-system1derek = function(sel_genre, n = 10){
+system1_part2 = function(sel_genre, n = 10){
   return(genre_recs[1:n, sel_genre])
 }
 
@@ -123,6 +121,6 @@ for(i in 1:length(unique_combo_genres)){
   all_genres = c(all_genres, unlist(strsplit(unique_combo_genres[i], split = "|", fixed = T)))
 }
 
-create_margin_ratings()
+create_margin_popularity()
 write_recommendations()
-system1derek("Action")
+system1_part2("Adventure")
