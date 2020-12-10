@@ -1,0 +1,208 @@
+---
+title: "Project 4 - Movie Reviews"
+author:
+  - Derek Chapman - derek4
+  - Zeed Jarrah (zjarrah2)
+output: 
+  html_document: 
+    highlight: tango
+    theme: yeti
+---
+
+# Setup
+
+```{r libraries, message=FALSE, cache = T}
+library(recommenderlab)
+library(Matrix)
+library(dplyr)
+library(plyr)
+library(data.table)
+set_cache = T
+```
+
+> First we load and parse the Movie and Ratings data.  We do not load the images for ease of processing nor do we load the users since we do not use their information for any of our systems/algorithms.
+
+```{r get-data}
+##ratings
+myurl = "https://liangfgithub.github.io/MovieData/"
+ratings = read.csv(paste0(myurl, 'ratings.dat?raw=true'), 
+                   sep = ':',
+                   colClasses = c('integer', 'NULL'), 
+                   header = FALSE)
+colnames(ratings) = c('UserID', 'MovieID', 'Rating', 'Timestamp')
+ratings = ratings[, -4]   #dont need timestamp
+
+##movies
+movies = readLines(paste0(myurl, 'movies.dat?raw=true'))
+movies = strsplit(movies, split = "::", fixed = TRUE, useBytes = TRUE)  #seperated by ::
+movies = matrix(unlist(movies), ncol = 3, byrow = TRUE)  #is a list of lists
+movies = data.frame(movies, stringsAsFactors = FALSE)  # one line per movie unlike the ratings
+colnames(movies) = c('MovieID', 'Title', 'Genres')
+movies$MovieID = as.integer(movies$MovieID)  #treats MovieID as a character which makes difficult to matchup
+
+# convert accented characters
+movies$Title = iconv(movies$Title, "latin1", "UTF-8")
+
+# extract year from movie title
+movies$Year = as.numeric(unlist(
+  lapply(movies$Title, function(x) substr(x, nchar(x)-4, nchar(x)-1))))  
+```
+
+# System 1 Genre Recommendations
+## Algorithm 1 - 'Margin Ratings'
+> For the first algorithm we rate movies based on the size of their margins.  That is we suggest the top movies based on the absolute value of the sum of their centered ratings.  The thinking is that many movies are popular becuase they are "so bad they're good".  We also keep the 'raw margin' since after processing we wont know which movies had their signs flipped.
+
+```{r calculate_margin_rating, cache = set_cache}
+n_movies = nrow(movies)
+movies$margin_rating = NA
+movies$raw_margin = NA
+
+for (i in 1:n_movies) {
+  #snag each movie by their ID#
+  id = movies$MovieID[i]
+  
+  #get all ratings matching that ID#
+  ratings_for_movie = ratings[ratings$MovieID == id, "Rating"]
+  ratings_for_movie = ratings_for_movie - 3 # center onto 0
+  
+  #get raw margin for exploration
+  movies[i, "raw_margin"] = sum(ratings_for_movie)
+  
+  # calculate and store margin (sum + abs)
+  movies[i, "margin_rating"] = abs(sum(ratings_for_movie))
+}
+```
+
+> Somewhat suprisingly there are a signf
+
+-----insert a graph here of the distribution of raw margin scores
+
+> Next we create the genre suggestions.  We select the top 50 for each genre and save them as a cvs to make loading recommendations easier/quicker later on.  The assumption here is that most people would not look beyond the first 10 recommendations much less the first 50. 
+
+```{r write-recommendations, cache = set_cache}
+genre_list = c("Action", "Adventure", "Animation",
+    "Children's", "Comedy", "Crime", "Documentary",
+    "Drama", "Fantasy", "Film-Noir", "Horror",
+    "Musical", "Mystery", "Romance", "Sci-Fi",
+    "Thriller", "War", "Western")
+  
+#turn movies/genres into a boolean matrix of movies x genres
+genres = as.data.frame(movies$Genres, stringsAsFactors = FALSE)
+tmp = as.data.frame(tstrsplit(genres[, 1], '[|]',
+                              type.convert = TRUE),
+                    stringsAsFactors = FALSE)
+genre_matrix = matrix(0, nrow(movies), length(genre_list))
+for (i in 1:nrow(tmp)) {
+  genre_matrix[i, genre_list %in% tmp[i, ]] = 1
+}
+colnames(genre_matrix) = genre_list
+remove("tmp", "genres")
+
+#create a matrix 50 movies x genre
+genre_recs_mat = matrix("-", 50, length(genre_list))
+colnames(genre_recs_mat) = genre_list
+
+#for each genre
+for (g in genre_list) {
+  #grab all movies that are tagged with that genre
+  m = which(genre_matrix[, g] == 1)
+  movs = movies[m, c("Title", "margin_rating")]
+  
+  #sort by margin rating
+  movs = arrange(movs, desc(margin_rating))
+  genre_recs_mat[, g] = movs$Title[1:50]
+}
+
+#save recommendations for later
+write.csv(genre_recs_mat,
+  file = "genre_recommendations.csv",
+  row.names = F)
+```
+
+## Algorithm 2 - Naive Approach with Minimum Support
+
+---put zeeds algorithm in here
+
+# System 2
+
+```{r helper-functions, cache = set_cache}
+create_rating_matrix = function(ratings_df){
+  #create a sparse matrix with data x at location i,j
+  i = paste0('u', ratings_df$UserID) #user number ...
+  j = paste0('m', ratings_df$MovieID) #movie number ...
+  x = ratings_df$Rating
+  
+  #nessecary to prevent sparseMatrix freaking out over i + j being characters instead of integers
+  tmp = data.frame(i, j, x, stringsAsFactors = T)
+  Rmat = sparseMatrix(as.integer(tmp$i), as.integer(tmp$j), x = tmp$x)
+  #the levels for each are the order in which the data is already entered into the matrix
+  rownames(Rmat) = levels(tmp$i)
+  colnames(Rmat) = levels(tmp$j)
+  
+  #realRatingMatrix is an actual datatype.  
+  #For whatever reason Recommender() requires a specific type of matrix object
+  Rmat = new('realRatingMatrix', data = Rmat)
+}
+```
+
+# Exploration of Methods available from Recommender Lab
+
+> We first did an exploratory run of the most common filtering methods.  We included Random as the base line then tested: Popular, User-Based CF, Item-Based CF, and SVD.  
+
+```{r eda, eval = F}
+Rmat = create_rating_matrix(smol_ratings)
+r_eval_scheme = evaluationScheme(Rmat, train = 0.8, 
+                                 method = 'cross', k = 5, 
+                                 given = -2, goodRating = 5)
+algos = list(
+  "Random"  = list(name = "RANDOM", param = NULL),
+  'Popular' = list(name = 'POPULAR', param = NULL),
+  'UBCF'    = list(name = 'UBCF', param = list(nn = 25)),
+  'IBCF'    = list(name = 'IBCF', param = list(k = 25)),
+  'SVD'     = list(name = 'SVD', param = list(k = 25))
+)
+
+results = evaluate(r_eval_scheme, algos, type = 'ratings')
+
+clrs = c('gray30', 'dodgerblue', 'orange', 'magenta4', 'tomato')
+plot(results, 'prec/rec', 
+     main = ,
+     col = clrs)
+title(main = "Scores using Full Dataset, 5-Fold CV, Given-10")
+```
+
+> Interestingly Item-Based CF does terribly in this setup.  Even worse than Random.  These seemed unlikely so we re-ran while using *all but 2* to give the recommender system the most data to train on.  Unfortunately this did not improve the outcome.
+
+![full-dataset_given-10](scores_Full-run_given10.jpeg)
+
+
+
+## Algorithm 1 - ZVD
+> We first explore how well an SVD 
+
+```{r S2A1-SVD, cache = set_cache}
+num_iterations = 10
+rmse = integer(num_iterations)
+
+for(i in 1:num_iterations){
+  Rmat  = create_rating_matrix(ratings)
+  r_eval_scheme = evaluationScheme(Rmat, 
+                                   method = 'split', train = 0.8, 
+                                   given = 10, goodRating = 5)
+  rec_UBCF = Recommender(getData(r_eval_scheme, 'train'), 
+                         method = 'SVD',
+                         parameter = list(normalize = 'center', 
+                                          k = 25))
+  preds = predict(rec_UBCF, getData(r_eval_scheme, 'known'), type = 'ratings')
+  
+  #calculate RMSE
+  error = calcPredictionAccuracy(preds, getData(r_eval_scheme, 'unknown'))
+  rmse[i] = error[[1]]
+}
+
+rmse
+print(paste0("Average RMSE: ", mean(rmse)))
+```
+
+
+
