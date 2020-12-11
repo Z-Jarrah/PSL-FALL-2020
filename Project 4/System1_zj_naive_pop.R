@@ -24,24 +24,21 @@ colnames(movies) = c('MovieID', 'Title', 'Genres')
 movies$MovieID = as.integer(movies$MovieID)  #treats MovieID as a character which makes difficult to matchup
 
 # convert accented characters
-movies$Title[73]
 movies$Title = iconv(movies$Title, "latin1", "UTF-8")
-movies$Title[73]
 
 # extract year from movie title
 movies$Year = as.numeric(unlist(
   lapply(movies$Title, function(x) substr(x, nchar(x)-4, nchar(x)-1))))  
 
 ##load genre recommendations
-genre_recs = as.data.frame(read.csv('genre_recommendations.csv', header = T))
+genre_recs = as.data.frame(read.csv('zj_genre_recommendations.csv', header = T))
 
-#system 1derek - genre recommendation ----
+#system 1
 
 ##create margin and raw_margin rating ----
-create_margin_popularity = function() {
+create_popularity_rating = function() {
   n_movies = nrow(movies)
-  movies$margin_rating = NA
-  movies$raw_margin = NA
+  movies$popularity_rating = NA
   
   for (i in 1:n_movies) {
     if (i %% 500 == 0) {
@@ -53,12 +50,18 @@ create_margin_popularity = function() {
     
     #get all ratings matching that ID#
     ratings_for_movie = ratings[ratings$MovieID == id, "Rating"]
-    ratings_for_movie = abs(ratings_for_movie - 3) # center onto 0
     
+    if(length(ratings_for_movie) >= 100){
+      avg_rating = mean(ratings_for_movie) # center onto 0
+    }
+    else{
+      avg_rating = 0
+    }
     # calculate and store margin (sum + abs)
-    movies[i, "margin_rating"] = sum(ratings_for_movie)
+    movies[i, "popularity_rating"] = avg_rating
   }
 }
+
 
 ##write genre recommendations to file ----
 write_recommendations = function() {
@@ -88,7 +91,7 @@ write_recommendations = function() {
   for (g in genre_list) {
     #grab all movies that are tagged with that genre
     m = which(genre_matrix[, g] == 1)
-    movs = movies[m, c("Title", "margin_rating")]
+    movs = movies[m, c("MovieID", "popularity_rating")]
     
     #sort by margin rating
     movs = arrange(movs, desc(margin_rating))
