@@ -60,8 +60,11 @@ create_popularity_rating = function() {
     # calculate and store margin (sum + abs)
     movies[i, "popularity_rating"] = avg_rating
   }
+  
+  return(movies)
 }
 
+movies = create_popularity_rating()
 
 ##write genre recommendations to file ----
 write_recommendations = function() {
@@ -94,8 +97,8 @@ write_recommendations = function() {
     movs = movies[m, c("MovieID", "popularity_rating")]
     
     #sort by margin rating
-    movs = arrange(movs, desc(margin_rating))
-    genre_recs_mat[, g] = movs$Title[1:50]
+    movs = arrange(movs, desc(popularity_rating))
+    genre_recs_mat[, g] = movs$MovieID[1:50]
   }
   
   #save recommendations for later
@@ -124,6 +127,5 @@ for(i in 1:length(unique_combo_genres)){
   all_genres = c(all_genres, unlist(strsplit(unique_combo_genres[i], split = "|", fixed = T)))
 }
 
-create_margin_popularity()
 write_recommendations()
 system1_part2("Adventure")
