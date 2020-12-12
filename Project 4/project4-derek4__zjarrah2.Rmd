@@ -1,5 +1,6 @@
 ---
 title: "Project 4 - Movie Reviews"
+subtitle: "PSL 598 - Fall 2020"
 author:
   - Derek Chapman - derek4
   - Zeed Jarrah (zjarrah2)
@@ -9,7 +10,7 @@ output:
     theme: yeti
 ---
 
-# Setup
+## Setup
 
 ```{r libraries, message=FALSE, cache = T}
 library(recommenderlab)
@@ -48,9 +49,9 @@ movies$Year = as.numeric(unlist(
   lapply(movies$Title, function(x) substr(x, nchar(x)-4, nchar(x)-1))))  
 ```
 
-# System 1 Genre Recommendations
-## Algorithm 1 - 'Margin Ratings'
-For the first algorithm we rate movies based on the size of their margins.  That is we suggest the top movies based on the absolute value of the sum of their centered ratings.  The thinking is that many movies are popular because they are "so bad they're good".  We also keep the 'raw margin' since after processing we wont know which movies had their signs flipped.
+## System 1 Genre Recommendations
+### Algorithm 1 - 'Margin Ratings'
+For the first algorithm we rate movies based on the size of their margins.  That is we suggest the top movies based on the absolute value of the sum of their centered ratings.  The thinking is that many movies are popular because they are "so bad they're good".
 
 ```{r calculate_margin_rating, cache = set_cache}
 n_movies = nrow(movies)
@@ -73,9 +74,8 @@ for (i in 1:n_movies) {
 }
 ```
 
-======poorley written
+Somewhat surprisingly, there are a significant amount of movies that have a large negative margin rating.  The hope is that for certain genres it isnt dominated by lots of overwhelmingly popular movies (such as "Action") and at least some of these "so bad they're good movies"" will make it into the recommendations.
 
-Somewhat surprisingly, there are a significant amount of movies that have a large negative margin rating.  The hope is that for certain categories the caterogy isnt dominated by lots of overwhelmingly popular movies (like "Action") at least some of these 'so bad they're good movies' will make it into the recommendations.
 ```{r margin-ratings-graph, cache = set_cache}
 clrs = c(rep('tomato', 8), rep('dodgerblue', 10))
 hist(movies$raw_margin[movies$raw_margin < 800],
@@ -85,7 +85,7 @@ hist(movies$raw_margin[movies$raw_margin < 800],
      main = 'Raw Ratings within 2 Standard Deviations')
 ```
 
-Next we create the genre suggestions.  We select the top 50 for each genre and save them as a cvs to make loading recommendations easier/quicker later on.  The assumption here is that most people would not look beyond the first 10 recommendations much less the first 50. 
+Next we create the genre suggestions.  We select the top 50 for each genre and save them as a csv to make loading recommendations quicker later on.  The assumption here is that most people would not look beyond the first 10 recommendations, much less the first 50. 
 
 ```{r write-recommendations-S1A, cache = set_cache}
 genre_list = c("Action", "Adventure", "Animation",
@@ -137,14 +137,14 @@ system1A = function(sel_genre, n = 10){return(genre_recs_margin[1:n, sel_genre])
 We test our system by asking for the top 5 movie recommendations in the Genre 'Film-Noir' using System 1A.
 
 ```{r run-S1A, cache = set_cache}
-recs = system1A('Children.s', 5)
+recs = system1A('Film.Noir', 5)
 movies[movies$MovieID %in% recs, 'Title']
 ```
 
-## Algorithm 2 - Naive Popular Approach with Minimum Support
-Next we try a "Naive Popular Approach with Minimum Support".  This algorithm is aimed at returning popular movies based on a common understanding of 'popular'.  We disgard any movie with less than 100 reviews and then calculate the average rating for each movie with no modifications.  Thankfully becuase movies with a large number of reviews will have slightly different average ratings (out to at least the 1000ths place) there should be very few ties when ranking the movies by their popularity.
+### Algorithm 2 - Naive Popular Approach with Minimum Support
+Next we try "Naive Popular Approach with Minimum Support".  This algorithm is aimed at returning popular movies based on a common understanding of 'popular'.  We discard any movie with less than 100 reviews and then calculate the average rating for each movie with no modifications.  Thankfully becuase movies with a large number of reviews will have slightly different average ratings (out to at least the 1000ths place) there should be very few ties when ranking the movies by their average score.
 
-We choose 100 as the activation threshold since the average number of reviews per movie is around 250.  The assumption being that if a movie doesnt garner at least 100 reviews (no matter how high their overall rating is) we wouldnt consider them 'popular'.  
+We choose 100 ratings as the activation threshold since the average number of reviews per movie is around 250.  The assumption being that if a movie doesnt garner at least 100 reviews (no matter how high their overall rating is) we wouldnt consider them 'popular'.  You might call the movie "high quality" in that scenario but not "popular".  
 
 ```{r calc-popular-S1B, cache = set_cache}
 n_movies = nrow(movies)
@@ -211,7 +211,7 @@ movies[movies$MovieID %in% recs, 'Title']
 ```
 
 
-# System 2
+## System 2
 First we create a small helper function to return our ratings in a *user x movie* `realRatingMatrix` that is the preferred object in `recommenderLab`.
 ```{r helper-functions, cache = set_cache}
 create_rating_matrix = function(ratings_df){
@@ -227,13 +227,11 @@ create_rating_matrix = function(ratings_df){
   rownames(Rmat) = levels(tmp$i)
   colnames(Rmat) = levels(tmp$j)
   
-  #realRatingMatrix is an actual datatype.  
-  #For whatever reason Recommender() requires a specific type of matrix object
   Rmat = new('realRatingMatrix', data = Rmat)
 }
 ```
 
-# Exploration of Methods available from Recommender Lab
+### Exploration of Methods available from Recommender Lab
 
 We first did an exploratory run of the most common filtering methods.  We included Random as the base line and then tested: Popular, User-Based CF, Item-Based CF, and SVD.  
 
@@ -259,12 +257,12 @@ plot(results, 'prec/rec',
 title(main = "Scores using Full Dataset, 5-Fold CV, Given-10")
 ```
 
-Interestingly Item-Based CF does terribly in this setup, even worse than Random.  This seemed counter-intuitive so we re-ran the evaluation while using *all but 2* to give the recommender system the most data to train on.  Unfortunately, this only led to a slight improvement in the IBCF and it remained about on par with just randomly suggesting a movie to a given user.
+Interestingly Item-Based CF does terribly in this setup; even worse than Random.  This seemed counter-intuitive so we re-ran the evaluation while using *all-but-2* to give the recommender system the most data to train on.  Unfortunately, this only led to a slight improvement in IBCF and it remained about on par with just randomly suggesting a movie to a given user.
 
-![full-dataset_given-10](scores_Full-run_given10.jpeg)
+![](scores_Full-run_given10.jpeg)
 
 
-## Algorithm 1 - SVD
+### Algorithm 1 - SVD
 SVD is the first algorithm that we train a recommend system on.  At first SVD doesn't seem like a logical choice since it does not use/give direct probabilities and is more suited to a binary classification setting.  We also run into the problem that the function being used by `recommenderLab` is not SVD in a traditional sense.  It does not use a controllable cost parameter to enfluence the splitting.  However based on our exploratory run it does at least as well as UBCF.
 
 ```{r S2A1-SVD-sim, cache = set_cache}
@@ -302,7 +300,7 @@ abline(h = mean(rmse_SVD), lty = 4, lwd = 2)}
 ```
 
 
-## Algorithm 2 - UBCF
+### Algorithm 2 - UBCF
 
 Our second algorithm is User-Based CF.  Although UBCF is a computationally intensive method that did worse than the 'popular' method in our EDA we choose it purely based on our own personal interest in how it works.
 
