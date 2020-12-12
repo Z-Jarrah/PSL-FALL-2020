@@ -22,7 +22,7 @@ set_cache = T
 
 First we load and parse the Movie and Ratings data.  We do not load the images in this Markdown doc for ease of processing nor do we load the users since we do not use their information for any of our systems/algorithms.
 
-```{r get-data}
+```{r get-data, cache = T, set_cache}
 ##ratings
 myurl = "https://liangfgithub.github.io/MovieData/"
 ratings = read.csv(paste0(myurl, 'ratings.dat?raw=true'), 
@@ -194,12 +194,12 @@ for (g in genre_list) {
 
 #save recommendations for later
 write.csv(genre_recs_mat,
-          file = "genre_recommendations_S1B.csv",
+          file = "genre_recommendations_pop_S1B.csv",
           row.names = F)
 ```
 
 ```{r pre-S1B, cache = set_cache}
-genre_recs_pop = as.data.frame(read.csv('genre_recommendations_S1B.csv',
+genre_recs_pop = as.data.frame(read.csv('genre_recommendations_pop_S1B.csv',
                                            header = T))
 
 system1B = function(sel_genre, n = 10){return(genre_recs_pop[1:n, sel_genre])}
@@ -278,7 +278,7 @@ for(i in 1:num_iterations){
                                    given = 10, goodRating = 5)
   rec_SVD = Recommender(getData(r_eval_scheme, 'train'), 
                          method = 'SVD',
-                         parameter = list(normalize = 'center', k = 25))
+                         parameter = list(normalize = 'center', k = 25, maxiter = 50))
   preds   = predict(rec_SVD, getData(r_eval_scheme, 'known'), type = 'ratings')
   
   #calculate RMSE
@@ -288,15 +288,16 @@ for(i in 1:num_iterations){
 ```
 
 ```{r svd-graph, cache = set_cache}
-{barplot(rmse_svd,
+{barplot(rmse_SVD, xpd=F,
+         names = c(1:10),
         ylim = c(0.6, 1.4),
         ylab = 'RMSE',
         xlab = 'Iteration',
         main = 'Error over 10 iterations for SVD Recommender',
         col = 'tomato',
-        xaxt = "")
-axis(1, at = c(1:10), labels = c(1:10))
-text(bp, rmse_SVD + 0.4, rmse_SVD, cex=1) 
+        xaxt = NULL)
+# axis(1, at = c(1:10), labels = c(1:10))
+# text(rmse_SVD + 0.4, rmse_SVD, cex=1) 
 abline(h = mean(rmse_SVD), lty = 4, lwd = 2)}
 ```
 
@@ -326,15 +327,17 @@ for(i in 1:num_iterations){
 
 
 ```{r UBCF-graph, cache = set_cache}
-{barplot(rmse_UBCF,
+{barplot(rmse_UBCF, xpd=F,
+         names = c(1:10),
         ylim = c(0.6, 1.4),
         ylab = 'RMSE',
         xlab = 'Iteration',
         main = 'Error over 10 iterations for UBCF Recommender',
         col = 'orange',
-        xaxt = "")
-axis(1, at = c(1:10), labels = c(1:10))
-text(bp, rmse_UBCF + 0.4, rmse_UBCF, cex=1) 
-abline(h = mean(rmse_UBCF), lty = 4, lwd = 2)}
+        xaxt = NULL)
+# axis(1, at = c(1:10), labels = c(1:10))
+# text(rmse_UBCF + 0.4, rmse_UBCF, cex=1) 
+abline(h = mean(rmse_UBCF), lty = 4, lwd = 2)
+}
 ```
 
