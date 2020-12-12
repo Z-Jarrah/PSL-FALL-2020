@@ -10,6 +10,9 @@
 library(shiny)
 library(shinydashboard)
 
+source('system1_functions.R')
+source('system2_functions.R')
+
 # library(shinyjs)
 
 # Local image thing Add directory of static resources to Shiny's web server
@@ -41,9 +44,8 @@ shinyUI(
           br(),
           actionButton("btn", "Click to get your highly scientific personalized recommendations", class = "btn-warning"),
           br(),
-          uiOutput('results')
-          # tableOutput("results")
-        )
+          tableOutput("results")
+        )#box
       )#fluidRow 2 results
     )#dashboardBody
   )#dashpoardPage
