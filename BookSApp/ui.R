@@ -1,19 +1,10 @@
-#
-# This is the user-interface definition of a Shiny web application. You can
-# run the application by clicking 'Run App' above.
-#
-# Find out more about building applications with Shiny here:
-# 
-#    http://shiny.rstudio.com/
-#
+#ui.R
 
 library(shiny)
 library(shinydashboard)
 
 source('system1_functions.R')
 source('system2_functions.R')
-
-# library(shinyjs)
 
 # Local image thing Add directory of static resources to Shiny's web server
 duckit = "imgResources/duck_it.png"
@@ -22,9 +13,6 @@ addResourcePath(prefix = "imgResources", directoryPath = "images")
 # Define UI for application that draws a histogram
 shinyUI(
   dashboardPage(
-    # Application title
-    # titlePanel("Old Faithful Geyser Data"),
-    
     skin = "blue",
     dashboardHeader(title = "Movies!"),
     dashboardSidebar(disable = TRUE),

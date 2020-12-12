@@ -1,10 +1,4 @@
-#
-# This is the server logic of a Shiny web application. You can run the 
-# application by clicking 'Run App' above.
-#
-# Find out more about building applications with Shiny here:
-# 
-#    http://shiny.rstudio.com/
+# server.R
 
 library(dplyr)
 library(data.table)
@@ -43,7 +37,7 @@ colnames(ratings) = c('UserID', 'MovieID', 'Rating', 'Timestamp')
 ratings = ratings[, -4]   #dont need timestamp
 
 
-# process input value junk
+# process input value into a sensible dataframe
 get_user_ratings <- function(value_list) {
   dat <- data.table(movie_id = sapply(strsplit(names(value_list), "_"), function(x) ifelse(length(x) > 1, x[[2]], NA)),
                     rating = unlist(as.character(value_list)))
@@ -51,14 +45,8 @@ get_user_ratings <- function(value_list) {
   dat[rating == " ", rating := 0]
   dat[, ':=' (movie_id = as.numeric(movie_id), rating = as.numeric(rating))]
   dat <- dat[rating > 0]
-  # cat(file=stderr(), "reactvalues ", as.character(dat[1,1]))
-  # get the indices of the ratings
-  # add the user ratings to the existing rating matrix
+
   return(dat)
-  # user_ratings <- sparseMatrix(i = dat$book_id, 
-  #                              j = rep(1,nrow(dat)), 
-  #                              x = dat$rating, 
-  #                              dims = c(nrow(ratingmat), 1))
 }
 
 # server logic ----
@@ -122,5 +110,4 @@ shinyServer(function(input, output) {
       }))) #list/fluidRow/lapply/function - columns
     }) #lapply/function - rows
   }) # output$results renderUI function
-  # output$results <- renderTable(iris)
 })#shinyServer
