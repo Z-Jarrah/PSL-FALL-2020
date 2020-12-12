@@ -128,6 +128,12 @@ for(i in 1:length(unique_combo_genres)){
   all_genres = c(all_genres, unlist(strsplit(unique_combo_genres[i], split = "|", fixed = T)))
 }
 
+clrs = c(rep('tomato', 8), rep('dodgerblue', 10))
+hist(movies$raw_margin[movies$raw_margin < 800],
+     xlim = c(-800, 800),
+     breaks = 20,
+     col = clrs,
+     main = 'Raw Ratings within 2 Standard Deviations')
 
 # system 2a ----
 set.seed(0721)
@@ -206,19 +212,19 @@ image(normal_Rmat[1:10, 1:20]) #produces a heatmap style plot
 hist(getRatings(Rmat))
 hist(getRatings(normal_Rmat))
 
-r_eval_scheme = evaluationScheme(Rmat, 
+r_eval_scheme_split = evaluationScheme(Rmat, 
                                  method = 'split', train = 0.8, 
-                                 given = 10, goodRating = 5)
+                                  given = 10, goodRating = 5)
 algos = list(
   "Random"  = list(name = "RANDOM", param = NULL),
-  'Popular' = list(name = 'POPULAR', param = NULL),
-  'UBCF'    = list(name = 'UBCF', param = list(nn = 25)),
-  'IBCF'    = list(name = 'IBCF', param = list(k = 25)),
-  'SVD'     = list(name = 'SVD', param = list(k = 25))
+  # 'Popular' = list(name = 'POPULAR', param = NULL),
+  # 'UBCF'    = list(name = 'UBCF', param = list(nn = 25)),
+  'IBCF'    = list(name = 'IBCF', param = list(k = 25))
+  # 'SVD'     = list(name = 'SVD', param = list(k = 25))
   # 'SVD50'     = list(name = 'SVD', param = list(k = 50))
 )
 
-results = evaluate(r_eval_scheme, algos, type = 'ratings')
+results_split = evaluate(r_eval_scheme, algos, type = 'ratings')
 
 clrs = c('gray30', 'dodgerblue', 'orange', 'magenta4', 'tomato')
 plot(results, 'prec/rec', 
@@ -227,3 +233,37 @@ plot(results, 'prec/rec',
 title(main = "Scores using Full Dataset, 5-Fold CV, Given-10")
 #using type = "topNList" gives wacky TPR/FPR evaluation since its only looking at a True Positive Rate involving N possible condididates (for example top 5)
 # it will return a bananas amoutn of True Negatives since everything that isnt in the top N will not get returned
+
+#explore IBCF evaluation wackyness
+algos = list(
+  "Random"  = list(name = "RANDOM", param = NULL),
+  'IBCF'    = list(name = 'IBCF', param = list(k = 25))
+  )
+r_eval_scheme_split = evaluationScheme(Rmat, 
+                                       method = 'split', train = 0.8, 
+                                       given = 10, goodRating = 5)
+results_split = evaluate(r_eval_scheme_split, algos, type = 'ratings')
+
+
+r_eval_scheme_cv5 = evaluationScheme(Rmat, 
+                                       method = 'cross', k = 5,
+                                       given = 10, goodRating = 5)
+results_cv5 = evaluate(r_eval_scheme_cv5, algos, type = 'ratings')
+
+plot(results_split)
+plot(results_cv5)
+
+
+# test graph before full run
+rmse_UBCF
+
+bp = barplot(rmse_UBCF, xpd=F,
+        ylim = c(0.6, 1.4),
+        ylab = 'RMSE',
+        xlab = 'Iteration',
+        main = 'Error over 10 iterations for UBCF Recommender',
+        col = 'orange',
+        xaxt = NULL)
+axis(1, at = c(1:10), labels = c(1:10))
+text(x = c(1:10), y = rmse_UBCF + 0.4, labels = rmse_UBCF, cex=1) 
+abline(h = mean(rmse_UBCF), lty = 4, lwd = 2)

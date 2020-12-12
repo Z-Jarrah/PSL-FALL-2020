@@ -51,13 +51,6 @@ get_user_ratings <- function(value_list) {
 
 # server logic ----
 shinyServer(function(input, output) {
-  # retrieve_genre_selection <- eventReactive(input$genres_btn, {
-  #   # get the user's rating data
-  #   value_list <- reactiveValuesToList(genre_select)
-  #   
-  #   return(system2_recs(user_ratings))
-  # })
-  
   output$genre_selection <- renderUI({
     selected_genre = input$genre_select_menu
     if(selected_genre == ""){h3("Select a Genre to see some recommendations")}
@@ -103,7 +96,7 @@ shinyServer(function(input, output) {
           current_movieID = mIDs_for_rating[(i-1)*num_movies + j]
           img_url = paste0("https://liangfgithub.github.io/MovieImages/", current_movieID, ".jpg?raw=true")
           
-          list(box(width = 2, title = current_movieID,
+          list(box(width = 2,
                   div(style = "text-align:center", img(src = img_url, height = 150)),
                   div(style = "text-align:center; color: black; font-size: 18px", 
                       movies$Title[movies$MovieID == current_movieID]),
@@ -128,7 +121,6 @@ shinyServer(function(input, output) {
     num_movies  = 5
     rec_results = as.integer(retrieve_ratings()) #returns a simple list
   
-
     lapply(1:num_rows, function(i) {
       list(fluidRow(lapply(1:num_movies, function(j) {
         current_movieID = rec_results[(i-1)*num_movies + j]
