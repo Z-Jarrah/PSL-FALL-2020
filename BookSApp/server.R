@@ -51,7 +51,45 @@ get_user_ratings <- function(value_list) {
 
 # server logic ----
 shinyServer(function(input, output) {
-  #get active user ratings
+  # retrieve_genre_selection <- eventReactive(input$genres_btn, {
+  #   # get the user's rating data
+  #   value_list <- reactiveValuesToList(genre_select)
+  #   
+  #   return(system2_recs(user_ratings))
+  # })
+  
+  output$genre_selection <- renderUI({
+    selected_genre = input$genre_select_menu
+    if(selected_genre == ""){h3("Select a Genre to see some recommendations")}
+    else{
+      selected_genre = gsub("'", ".", selected_genre)
+      selected_genre = gsub("-", ".", selected_genre)
+      
+      num_rows    = 1
+      num_movies  = 5
+      rec_results = as.integer(system1_recs(selected_genre)) #returns a simple list
+      
+      lapply(1:num_rows, function(i) {
+        list(fluidRow(lapply(1:num_movies, function(j) {
+          current_movieID = rec_results[(i-1)*num_movies + j]
+          img_url = paste0("https://liangfgithub.github.io/MovieImages/", current_movieID, ".jpg?raw=true")
+          
+          box(width = 2, status = "success", solidHeader = FALSE, 
+              #         div(style = "text-align:center",
+              #             a(href = paste0('https://www.goodreads.com/book/show/', books$best_book_id[recom_result$Book_id[(i - 1) * num_books + j]]),
+              #               target='blank',
+              #               img(src = books$image_url[recom_result$Book_id[(i - 1) * num_books + j]], height = 150))
+              #         ),
+              div(style = "text-align:center", img(src = img_url, height = 150)),
+              div(style = "text-align:center; color: darkred; font-size: 18px",
+                  movies$Title[movies$MovieID == current_movieID])
+              )#box
+          }))) #list/fluidRow/lapply/function - columns
+        }) #lapply/function - rows
+    }#else
+  })#genre_selection
+  
+  #display sample movies for active user to rate
   output$ratings <- renderUI({
     num_rows   = 3
     num_movies = 5 #columns
@@ -77,6 +115,7 @@ shinyServer(function(input, output) {
     )#fluidRow 1
   })#output$ratings
   
+  #get active users input after they click the button
   retrieve_ratings <- eventReactive(input$btn, {
     # get the user's rating data
     value_list <- reactiveValuesToList(input)
