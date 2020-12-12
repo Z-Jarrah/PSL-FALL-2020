@@ -23,7 +23,7 @@ set_cache = T
 
 First we load and parse the Movie and Ratings data.  We do not load the images in this Markdown doc for ease of processing nor do we load the users since we do not use their information for any of our systems/algorithms.
 
-```{r get-data, cache = T, set_cache}
+```{r get-data, cache = set_cache}
 ##ratings
 myurl = "https://liangfgithub.github.io/MovieData/"
 ratings = read.csv(paste0(myurl, 'ratings.dat?raw=true'), 
@@ -258,9 +258,9 @@ title(main = "Scores using Full Dataset, 5-Fold CV, Given-10")
 ```
 
 Interestingly Item-Based CF does terribly in this setup; even worse than Random.  This seemed counter-intuitive so we re-ran the evaluation while using *all-but-2* to give the recommender system the most data to train on.  Unfortunately, this only led to a slight improvement in IBCF and it remained about on par with just randomly suggesting a movie to a given user.
-
-![](scores_Full-run_given10.jpeg)
-
+<center>
+<img src="scores_Full-run_given10.jpeg" style="zoom:75%;" />
+</center>
 
 ### Algorithm 1 - SVD
 SVD is the first algorithm that we train a recommend system on.  At first SVD doesn't seem like a logical choice since it does not use/give direct probabilities and is more suited to a binary classification setting.  We also run into the problem that the function being used by `recommenderLab` is not SVD in a traditional sense.  It does not use a controllable cost parameter to enfluence the splitting.  However based on our exploratory run it does at least as well as UBCF.
@@ -285,7 +285,7 @@ for(i in 1:num_iterations){
 }
 ```
 
-```{r svd-graph, cache = set_cache}
+```{r svd-graph, cache = set_cache, fig.align = 'center'}
 {barplot(rmse_SVD, xpd=F,
          names = c(1:10),
         ylim = c(0.6, 1.4),
@@ -324,7 +324,7 @@ for(i in 1:num_iterations){
 ```
 
 
-```{r UBCF-graph, cache = set_cache}
+```{r UBCF-graph, cache = set_cache, fig.align = 'center'}
 {barplot(rmse_UBCF, xpd=F,
          names = c(1:10),
         ylim = c(0.6, 1.4),
