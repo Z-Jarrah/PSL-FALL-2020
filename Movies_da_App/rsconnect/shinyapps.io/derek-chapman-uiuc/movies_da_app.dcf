@@ -1,0 +1,10 @@
+name: movies_da_app
+title:
+username:
+account: derek-chapman-uiuc
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 3393976
+bundleId: 3981065
+url: https://derek-chapman-uiuc.shinyapps.io/movies_da_app/
+when: 1607825166.84408
